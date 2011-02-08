@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% macro form_field(field) %}
+<div>
+{{field.label}} {{field}}
+{% if field.errors %}
+<ul class="errors">
+{% for error in field.errors %}
+<li>{{error}}</li>
+{% endfor %}
+</ul>
+{% endif %}
+</div>
+{% endmacro %}
+
+{% block content %}
+<h1>Create a Circle</h1>
+
+<form action="{{url_for('new_circle')}}" method="POST">
+{% for field in circle_form %}
+{{ form_field(field) }}
+{% endfor %}
+
+{% for field in membership_form %}
+{{ form_field(field) }}
+{% endfor %}
+
+<div><button>Make It!</button></div>
+</form>
+
+{% endblock %}

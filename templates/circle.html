@@ -1,0 +1,27 @@
+{% extends 'base.html'%}
+{% block content %}
+<h1>{{circle.name}}</h1>
+
+{% macro comment_form(form) %}
+<form action="{{url_for('new_comment', id=circle.id)}}" method="POST">
+<div>{{form.text}}</div>
+{{form.discussion_id}} {{form.parent_id}}
+<button>Post</button>
+</form>
+{% endmacro %}
+
+<h2>Post Something</h2>
+{{ comment_form(discussion_form) }}
+</form>
+
+<ul >{% for discussion in discussions %}
+<li class="discussion"><ul> {% for comment in discussion.root_comments recursive %}
+<li>{{ comment.text }}
+{{ comment_form(comment.reply_form) }}
+{% if comment.children %}
+<ul class="thread">{{ loop(comment.children) }}</ul>
+{% endif %}
+{% endfor %}</ul>
+{% endfor %}</ul>
+
+{% endblock %}
