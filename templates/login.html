@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% from 'forms.html' import form_field %}
+{% block content %}
+
+<form action="{{url_for('login')}}" method="POST">
+{% for field in form %}
+{{ form_field(field) }}
+{% endfor %}
+<button name="action" value="login">Login</button> or 
+<button name="action" value="register">Register</button>
+</form>
+
+{% endblock %}

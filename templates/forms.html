@@ -1,0 +1,15 @@
+{% macro form_field(field) %}
+<div>{{field.label}}</div>
+<div>{{field}}</div>
+{% if field.description %}
+<div>{{field.description}}</div>
+{% endif %}
+{% if field.errors %}
+<ul class="errors">
+{% for error in field.errors %}
+<li>{{error}}</li>
+{% endfor %}
+</ul>
+{% endif %}
+</div>
+{% endmacro %}

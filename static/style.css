@@ -1,4 +1,7 @@
-label {display:block}
+html {font-family:helvetica}
+a {color:blue; cursor:pointer; text-decoration:none}
+a:hover {text-decoration:underline}
 ul {margin:0; padding:0; list-style:none}
 .discussion {background-color:#eee; margin:1ex; padding:0}
 .thread {margin-left:5ex}
+input[type=text], textarea {font-family:inherit; font-size:inherit}

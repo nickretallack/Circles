@@ -3,6 +3,7 @@ from flaskext.sqlalchemy import SQLAlchemy
 from werkzeug import generate_password_hash, check_password_hash
 from werkzeug.datastructures import MultiDict
 from wtforms import *
+from uuid import uuid4 as make_invitation_id
 
 def required(result):
     if not result:
@@ -10,6 +11,7 @@ def required(result):
     return result
 
 app = Flask(__name__)
+app.secret_key = 'seeeecret'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgres://nick@localhost/circles'
 db = SQLAlchemy(app)
 
@@ -32,6 +34,14 @@ class PasswordCredentials(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     login = db.Column(db.String(80), unique=True, primary_key=True)
     hashed_password = db.Column(db.String(80))
+
+    user = db.relationship(User, backref='credentials')
+
+    def set_password(self, password):
+        self.hashed_password = generate_password_hash(password)
+        
+    def check_password(self, password):
+        return check_password_hash(self.hashed_password, password)
 
 class OpenIDCredentials(db.Model):
     __tablename__ = 'openids'
@@ -151,6 +161,19 @@ class EventCircles(db.Model):
     circle_id = db.Column(db.Integer, db.ForeignKey('circles.id'), primary_key=True)
     discussion_id = db.Column(db.Integer, db.ForeignKey('discussions.id'))
     
+class Invitation(db.Model):
+    __tablename__ = 'invitations'
+    id = db.Column(db.String(80), primary_key=True)
+    circle_id = db.Column(db.Integer, db.ForeignKey('circles.id'))
+    inviter_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    inviter = db.relationship(User, backref='invitations')
+    
+    def __init__(self, **kwargs):
+        self.id = make_invitation_id()
+        super(Invitation, self).__init__(**kwargs)
+
+
 class JoinCircleForm(Form):
     nickname = TextField('What would you like to be called in this circle?')
     
@@ -166,11 +189,11 @@ class CommentForm(Form):
     
 @app.before_request
 def set_current_user():
-    user_id = web_session.get('current_user_id',None)
+    user_id = web_session.get('user_id',None)
     if user_id:
         g.user = User.query.filter_by(id=user_id).first()
     else:
-        g.user = db.session.query(User).filter_by(id=2).first() #None #AnonymousUser()
+        g.user = None
 
 @app.route("/")
 def front():
@@ -224,7 +247,51 @@ def new_comment(id):
 
         return redirect(url_for('show_circle',id=circle.id))
 
+class LoginForm(Form):
+    login = TextField('Login name', [validators.Required()],
+        description='This name is only used for logging in to the site.  No one will ever see it.')
+    password = PasswordField('Password', [validators.Required()])
+    
 
+@app.route('/login', methods=['GET','POST'])
+def login():
+    form = LoginForm(request.form)
+    if request.method == 'POST' and form.validate():
+        action = request.form.get('action',None)
+        login = form.login.data
+        password = form.password.data
+        credentials = db.session.query(PasswordCredentials).filter_by(login=login).first()
+        if action == 'login':
+            if not credentials:
+                form.login.errors.append("This login doesn't exist yet.")
+            elif credentials.check_password(password):
+                web_session['user_id'] = credentials.user.id
+                # flash successful login
+                return redirect(url_for('front'))
+            else:
+                form.password.errors.append("This password is incorrect for this login")
+            
+        elif action == 'register':
+            if credentials:
+                form.login.errors.append("This login already exists.")
+            else:
+                user = User()
+                credentials = PasswordCredentials(user=user, login=login)
+                credentials.set_password(password)
+
+                db.session.add(user)
+                db.session.add(credentials)
+                db.session.commit()
+                web_session['user_id'] = user.id
+        else:
+            return "Something is not right"
+
+    return render('login.html', form=form)
+
+@app.route('/logout')
+def logout():
+    web_session['user_id'] = None
+    return redirect(url_for('front'))
 
 if __name__ == "__main__":
     app.run(debug=True)

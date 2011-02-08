@@ -6,7 +6,8 @@
 
 <p>This site aims to help you meet more locals who share your interests, no matter how obscure they are.  You can keep up with your closest friends without worrying that your secrets could spread.</p>
 
-<a href="{{url_for('new_circle')}}">Create a circle of friends</a>
+{% if g.user %}
+<p><a href="{{url_for('new_circle')}}">Create a circle of friends</a></p>
 
 {% if your_circles.count() %}
 <h2>Your Circles</h2>
@@ -16,4 +17,11 @@
 {% else %}
 <p>Or ask your friends to invite you to one.</p>
 {% endif %}
+
+{% else %}
+<p><a href="{{url_for('login')}}">Login or register to start a circle</a></p>
+<p>Or ask your friends to invite you to one.</p>
+{% endif %}
+
+
 {% endblock %}

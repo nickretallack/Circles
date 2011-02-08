@@ -1,1 +1,12 @@
 This is going to need private messages.  Those will exist within circles too.
+
+
+Okay, invitations.  You send an email with a link in it.  The link should just contain a single hash.  All the relevant info would be in the database.
+
+Invitation:
+    uid
+    circle_id
+    inviter_id - person who invited you.  Automatically establishes trust with this user
+
+You might have an account already, or not.  Hm.  I need to handle logins now.
+Also figure out email.
