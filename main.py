@@ -66,6 +66,10 @@ class Circle(db.Model):
 
     creator = db.relationship(User, backref='circles_created')
 
+    @property
+    def url(self):
+        return url_for('show_circle', id=self.id)
+
 class CircleMembership(db.Model):
     __tablename__ = 'user_circles'
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
@@ -166,11 +170,12 @@ def set_current_user():
     if user_id:
         g.user = User.query.filter_by(id=user_id).first()
     else:
-        g.user = db.session.query(User).first() #None #AnonymousUser()
+        g.user = db.session.query(User).filter_by(id=2).first() #None #AnonymousUser()
 
 @app.route("/")
 def front():
-    return render('front.html')
+    your_circles = db.session.query(Circle).join(CircleMembership).filter(CircleMembership.user == g.user)
+    return render('front.html', your_circles=your_circles)
 
 @app.route('/circles/<int:id>')
 def show_circle(id):

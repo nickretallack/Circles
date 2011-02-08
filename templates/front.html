@@ -2,6 +2,18 @@
 
 {% block content %}
 <h1>Circles</h1>
+<p>Circles is a social network that respects your privacy.  If you like to keep your social circles separate, this is the place for you.  You can have a different nickname for every circle you're in, and only users you trust will know it's you.</p>
+
+<p>This site aims to help you meet more locals who share your interests, no matter how obscure they are.  You can keep up with your closest friends without worrying that your secrets could spread.</p>
+
 <a href="{{url_for('new_circle')}}">Create a circle of friends</a>
 
+{% if your_circles.count() %}
+<h2>Your Circles</h2>
+<ul>{% for circle in your_circles %}
+<li><a href="{{circle.url}} ">{{ circle.name }}</a>
+{% endfor %}</ul>
+{% else %}
+<p>Or ask your friends to invite you to one.</p>
+{% endif %}
 {% endblock %}
