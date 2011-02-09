@@ -2,15 +2,17 @@
 
 {% block content %}
 <h1>Circles</h1>
-<p>Circles is a social network that respects your privacy.  If you like to keep your social circles separate, this is the place for you.  You can have a different nickname for every circle you're in, and only users you trust will know it's you.</p>
+{% if not g.user %}
+<p>Circles is a social network that respects your privacy.  If you like to keep your social circles separate, this is the place for you.  You can have a different nickname in every group, and only users you trust will know it's you.</p>
 
-<p>This site aims to help you meet more locals who share your interests, no matter how obscure they are.  You can keep up with your closest friends without worrying that your secrets could spread.</p>
+<p>Our goal is to help you get together with people who share your interests, no matter how obscure they are.  You can keep up with your closest friends without worrying that your secrets could spread.  This site is still in beta, but soon you'll be able to share photos and start events.</p>
+{% endif %}
 
 {% if g.user %}
 <p><a href="{{url_for('new_circle')}}">Create a circle of friends</a></p>
 
 {% if your_circles.count() %}
-<h2>Your Circles</h2>
+<h2>Your Circles:</h2>
 <ul>{% for circle in your_circles %}
 <li><a href="{{circle.url}} ">{{ circle.name }}</a>
 {% endfor %}</ul>
@@ -23,7 +25,7 @@
 {% endif %}
 
 {% if invitations %}
-<h2>Invitations</h2>
+<h2>Invitations:</h2>
 <ul>{% for invitation_set in invitations %}
 <li>
     {% for invitation in invitation_set['invitations'] %}
