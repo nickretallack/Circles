@@ -257,6 +257,7 @@ class LoginForm(Form):
     login = TextField('Login name', [validators.Required()],
         description='This name is only used for logging in to the site.  No one will ever see it.')
     password = PasswordField('Password', [validators.Required()])
+    next = HiddenField()
     
 class AcceptInvitationForm(Form):
     join = FormField(JoinCircleForm)
@@ -303,11 +304,14 @@ def clicked_invitation(invitation):
     if circle_id not in g.invitations:
         g.invitations[circle_id] = []
     g.invitations[circle_id].append(invitation.id)
-    web_session['invitations'] = json.dumps(g.invitations)
+    save_active_invitations()
 
 @app.route('/invitation/<string:id>', methods=['GET','POST'])
 def invitation(id):
     invitation = get_required(Invitation, id)
+    if g.user == invitation.inviter:
+        flash("You can't send an invitation to yourself")
+        return redirect(url_for('front'))
     clicked_invitation(invitation)
     return redirect(invitation.circle.url)
     # If you have an invitation, that grants you a key to read anything in the group,
@@ -404,12 +408,16 @@ def join_circle(id):
 
         # delete the temporary invitation
         g.invitations[str(circle.id)] = []
-        web_session['invitations'] = json.dumps(g.invitations)
+        save_active_invitations()
 
         flash("You're a member now!  Your nickname here is %s" % nickname)
         return redirect(circle.url)
 
     return render('join_circle.html', circle=circle, form=form, invitations=invitations)
+
+def save_active_invitations():
+    web_session['invitations'] = json.dumps(g.invitations)
+    
 
 def parse_integer(integer):
     if not integer:
@@ -443,14 +451,33 @@ def new_comment(id):
 def set_current_user(user):
     if user is None:
         web_session['user_id'] = None
+        # also clear invitations if you log out
+        g.invitations = {}
+        save_active_invitations()
     else: 
         web_session['user_id'] = user.id
     
+def invalidate_self_invitations(user):
+    # you may have just accepted your own invitation
+    for invitation_set in get_active_invitations():
+        for invitation in invitation_set['invitations']:
+            if invitation.inviter == user:
+                g.invitations[str(invitation.circle_id)].remove(invitation.id)
+                flash("Oops!  You opened one of your own invitations")
+    save_active_invitations()
 
+    # This could also be used to establish trust with people who've
+    # invited you to circles you're already a member of
+    
 
 @app.route('/login', methods=['GET','POST'])
 def login():
-    form = LoginForm(request.form)
+    if request.method == 'GET':
+        referrer = request.referrer or url_for('front')
+    else:
+        referrer = url_for('front')
+
+    form = LoginForm(request.form, next=referrer)
     if request.method == 'POST' and form.validate():
         action = request.form.get('action',None)
         login = form.login.data
@@ -461,8 +488,9 @@ def login():
                 form.login.errors.append("This login doesn't exist yet.")
             elif credentials.check_password(password):
                 set_current_user(credentials.user)
+                invalidate_self_invitations(credentials.user)
                 # flash successful login
-                return redirect(url_for('front'))
+                return redirect(form.next.data)
             else:
                 form.password.errors.append("This password is incorrect for this login")
             
@@ -478,7 +506,7 @@ def login():
                 db.session.add(credentials)
                 db.session.commit()
                 set_current_user(user)
-                return redirect(url_for('front'))
+                return redirect(form.next.data)
         else:
             return "Something is not right"
 
