@@ -113,13 +113,18 @@ class Circle(db.Model):
 
 class CircleMembership(db.Model):
     __tablename__ = 'user_circles'
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     circle_id = db.Column(db.Integer, db.ForeignKey('circles.id'))
     nickname = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.Date)
 
     user = db.relationship(User, backref='memberships')
     circle = db.relationship(Circle, backref='memberships')
+
+    @property
+    def url(self):
+        return url_for('show_member', circle_id=self.circle_id, member_id=self.id)
 
 class Photo(db.Model):
     __tablename__ = 'photos'
@@ -163,8 +168,12 @@ class Comment(db.Model):
     user = db.relationship(User, backref='comments')
 
     @property
+    def membership(self):
+        return db.session.query(CircleMembership).filter(db.and_(CircleMembership.user == self.user, CircleMembership.circle == self.discussion.circle)).first()
+
+    @property
     def nickname(self):
-        return db.session.query(CircleMembership).filter(db.and_(CircleMembership.user == self.user, CircleMembership.circle == self.discussion.circle)).first().nickname
+        return self.membership.nickname
 
     @property
     def reply_form(self):
@@ -519,6 +528,13 @@ def login():
 def logout():
     set_current_user(None)
     return redirect(url_for('front'))
+
+@app.route('/circles/<int:circle_id>/members/<member_id>')
+def show_member(circle_id, member_id):
+    circle = get_required(Circle, circle_id)
+    member = get_required(CircleMembership, member_id)
+    check_access(circle)
+    return render('member.html', member=member)
 
 if __name__ == "__main__":
     app.run(debug=True)
