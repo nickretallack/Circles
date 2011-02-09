@@ -3,6 +3,22 @@
 <title>Circles</title>
 <link href='http://fonts.googleapis.com/css?family=Josefin+Slab' rel='stylesheet' type='text/css'>
 <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='style.css')}}">
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.0/jquery.min.js"></script>
+<script type="text/javascript">
+$(function(){
+    $('.reply').hide()
+    $('.reply-trigger').click(function(event){
+        var link = $(event.target)
+        var reply = link.parents('.comment:first').find('.reply:first')
+        reply.show()
+    })
+    $('.cancel-reply').click(function(event){
+        var link = $(event.target)
+        var reply = link.parents('.comment:first').find('.reply:first')
+        reply.hide()
+    })
+})
+</script>
 </head>
 <body>
 

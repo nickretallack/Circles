@@ -6,6 +6,9 @@
 <div>{{form.text}}</div>
 {{form.discussion_id}} {{form.parent_id}}
 <button>Post</button>
+    {% if form.discussion_id.data %}
+        <a class="comment-meta cancel-reply">Cancel</a>
+    {% endif %}
 </form>
 {% endif %}
 {% endmacro %}
@@ -19,16 +22,25 @@
 <p><a href="{{url_for('join_circle',id=circle.id)}}">Join this circle</a></p>
 {% endif %}
 
+<h2>Members:</h2>
+<ul>{% for membership in circle.memberships %}
+<li>{{membership.nickname}}
+{% endfor %}</ul>
+
+<h2>Discussion</h2>
 {% if has_membership %}
-<h2>Post Something</h2>
 {{ comment_form(discussion_form) }}
 </form>
 {% endif %}
 
 <ul >{% for discussion in discussions %}
 <li class="discussion"><ul> {% for comment in discussion.root_comments recursive %}
-<li>{{comment.nickname}} says: {{ comment.text }}
-{{ comment_form(comment.reply_form) }}
+<li class="comment"><div class="comment-text">{{ comment.text }}</div>
+    <div class="comment-meta">- {{comment.nickname}}.
+         <a class="reply-trigger">reply</a></div>
+    <div class="reply">
+        {{ comment_form(comment.reply_form) }}
+    </div>
 {% if comment.children %}
 <ul class="thread">{{ loop(comment.children) }}</ul>
 {% endif %}

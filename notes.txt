@@ -1,17 +1,20 @@
 Todo:
-    * Invitations
-        Handle the case where you're logged in when you receive one?  Is this different?  Nah.
-    Make it so when you log in it takes you back to the previous page if there was one
-        Put the referer in a hidden field in the login form
+    This is going to need private messages.  Those will exist within circles too.
     List users in a circle and give them member pages
     Change your name in a circle (and other settings in the future)
     Mark people as trusted when they accept each other's invitations
+    Don't let people re-use the same invitation
+    Mark invitations as clicked on once that happens
     
+Done:
+    Invitations
+        Handle the case where you're logged in when you receive one?  Is this different?  Nah.
+    Make it so when you log in it takes you back to the previous page if there was one
+        Put the referer in a hidden field in the login form
 
 
 
 
-This is going to need private messages.  Those will exist within circles too.
 
 
 Okay, invitations.  You send an email with a link in it.  The link should just contain a single hash.  All the relevant info would be in the database.
