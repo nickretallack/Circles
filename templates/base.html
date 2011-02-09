@@ -5,7 +5,12 @@
 </head>
 <body>
 {% if g.user %}
+{% if g.user.credentials %}
 <a href="{{url_for('logout')}}">Logout</a>
+{% else %}
+<p>You can use your invitation link to log in instantly.  However, in case you lose it, you should <a href="{{url_for('login')}}">set up some login credentials</a>.  In the mean time, keep that link a secret!</p>
+{% endif %}
+
 {% else %}
 <a href="{{url_for('login')}}">Login</a>
 {% endif %}

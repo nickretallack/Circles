@@ -1,6 +1,4 @@
 {% extends 'base.html'%}
-{% block content %}
-<h1>{{circle.name}}</h1>
 
 {% macro comment_form(form) %}
 <form action="{{url_for('new_comment', id=circle.id)}}" method="POST">
@@ -9,6 +7,11 @@
 <button>Post</button>
 </form>
 {% endmacro %}
+
+{% block content %}
+<h1>{{circle.name}}</h1>
+
+<p><a href="{{url_for('invite',id=circle.id)}}">Invite people you trust</a></p>
 
 <h2>Post Something</h2>
 {{ comment_form(discussion_form) }}

@@ -1,20 +1,48 @@
 from flask import Flask, render_template as render, request,  g, redirect, session as web_session, url_for
 from flaskext.sqlalchemy import SQLAlchemy
+from flaskext.mail import Mail
 from werkzeug import generate_password_hash, check_password_hash
 from werkzeug.datastructures import MultiDict
 from wtforms import *
-from uuid import uuid4 as make_invitation_id
+from uuid import uuid4 
+
+def make_invitation_id():
+    return uuid4().hex
 
 def required(result):
     if not result:
         abort(404)
     return result
 
+def get_required(model, id):
+    return required(db.session.query(model).filter_by(id=id).first())
+
 app = Flask(__name__)
 app.secret_key = 'seeeecret'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgres://nick@localhost/circles'
-db = SQLAlchemy(app)
 
+app.config.update(
+    MAIL_SERVER = 'smtp.gmail.com',
+    MAIL_PORT = 587,
+    MAIL_USE_TLS = True,
+    MAIL_USE_SSL = True,
+    MAIL_DEBUG = True,
+    MAIL_USERNAME = 'nickretallack',
+    MAIL_PASSWORD = 'Sporks27',
+    DEFAULT_MAIL_SENDER = 'nickretallack@gmail.com',
+    MAIL_FAIL_SILENTLY = False,
+)
+ADMINS = ['nickretallack@gmail.com']
+db = SQLAlchemy(app)
+mail = Mail(app)
+#if not app.debug:
+#    import logging
+#    from logging.handlers import SMTPHandler
+#    mail_handler = SMTPHandler('127.0.0.1',
+#                               'server-error@example.com',
+#                               ADMINS, 'YourApplication Failed')
+#    mail_handler.setLevel(logging.ERROR)
+#    app.logger.addHandler(mail_handler)
 
 class AnonymousUser(object):
     id = 0
@@ -166,16 +194,50 @@ class Invitation(db.Model):
     id = db.Column(db.String(80), primary_key=True)
     circle_id = db.Column(db.Integer, db.ForeignKey('circles.id'))
     inviter_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    acceptor_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
-    inviter = db.relationship(User, backref='invitations')
+    inviter = db.relationship(User, backref='invitations', primaryjoin=inviter_id == User.id)
+    acceptor = db.relationship(User, backref='invitations_accepted', primaryjoin=acceptor_id == User.id)
+    circle = db.relationship(Circle, backref='invitations')
+
+    @property
+    def url(self):
+        return url_for('invitation', id=self.id, _external=True)
+
+    @property
+    def inviter_name(self):
+        return db.session.query(CircleMembership).filter(db._and(CircleMembership.circle == self.circle, CircleMembership.user == self.inviter)).first().nickname
     
+    @property
+    def acceptor_name(self):
+        return db.session.query(CircleMembership).filter(db._and(CircleMembership.circle == self.circle, CircleMembership.user == self.acceptor)).first().nickname
+
     def __init__(self, **kwargs):
         self.id = make_invitation_id()
         super(Invitation, self).__init__(**kwargs)
 
+def invitations_for_circle(circle, user=None):
+    if not user:
+        user = g.user
+    return db.session.query(Invitation).filter(db.and_(Invitation.inviter == g.user, Invitation.circle == circle))
+
+def unused_invitations_for_circle(circle, user=None):
+    return invitations_for_circle(circle, user).filter(Invitation.acceptor == None)
+
+def make_invitations(circle, count=10):
+    # find out how many unused invitations there are
+    unused_invitations_count = unused_invitations_for_circle(circle).count() #db.session.query(Invitation).filter(db.and_(Invitation.inviter == g.user, Invitation.circle == circle, Invitation.acceptor == None)).count()
+
+    for index in xrange(count - unused_invitations_count):
+        invitation = Invitation(inviter=g.user, circle=circle)
+        db.session.add(invitation)
+
+
+class InviteEmailsForm(Form):
+    emails = TextAreaField("List some emails of people you'd like to invite. One per line please")
 
 class JoinCircleForm(Form):
-    nickname = TextField('What would you like to be called in this circle?')
+    nickname = TextField('What would you like to be called in this circle?', [validators.Required()])
     
 class CreateCircleForm(Form):
     name = TextField('Name your Circle', [validators.Length(min=2, max=80)])
@@ -187,6 +249,15 @@ class CommentForm(Form):
     parent_id = HiddenField()#IntegerField(widget=widgets.HiddenInput())
     discussion_id = HiddenField()#IntegerField(widget=widgets.HiddenInput())
     
+class LoginForm(Form):
+    login = TextField('Login name', [validators.Required()],
+        description='This name is only used for logging in to the site.  No one will ever see it.')
+    password = PasswordField('Password', [validators.Required()])
+    
+class AcceptInvitationForm(Form):
+    join = FormField(JoinCircleForm)
+    credentials = FormField(LoginForm)
+
 @app.before_request
 def set_current_user():
     user_id = web_session.get('user_id',None)
@@ -195,10 +266,42 @@ def set_current_user():
     else:
         g.user = None
 
+from flaskext.mail import Message
+
 @app.route("/")
 def front():
+#    msg = Message("Hello", sender="nickretallack@gmail.com", recipients=["nickretallack@gmail.com"])
+#    msg.body = "Testing"
+#    msg.html = "<b>Yeah</b>"
+#    mail.send(msg)
+
     your_circles = db.session.query(Circle).join(CircleMembership).filter(CircleMembership.user == g.user)
     return render('front.html', your_circles=your_circles)
+
+@app.route('/circles/<int:id>/invite')
+def invite(id):
+    circle = required(db.session.query(Circle).filter_by(id=id).first())
+    make_invitations(circle)
+    db.session.commit()
+    invitations = invitations_for_circle(circle).all()
+    return render('invite.html', circle=circle, invitations=invitations)
+
+@app.route('/invitation/<string:id>', methods=['GET','POST'])
+def invitation(id):
+    invitation = get_required(Invitation, id)
+    form = JoinCircleForm(request.form)
+    if request.method == 'POST' and form.validate():
+        # We create an honorary user so you can browse a bit before you create your credentials
+        user = User()
+        invitation.acceptor = user
+        membership = CircleMembership(user=user, circle=invitation.circle, nickname=form.nickname.data)
+        
+        db.session.add(user)
+        db.session.add(membership)
+        db.session.commit()
+        set_current_user(user)
+        return redirect(invitation.circle.url)
+    return render('invitation.html', invitation=invitation, form=form)
 
 @app.route('/circles/<int:id>')
 def show_circle(id):
@@ -212,6 +315,7 @@ def show_circle(id):
 def new_circle():
     circle_form = CreateCircleForm(request.form, prefix='circle')
     membership_form = JoinCircleForm(request.form, prefix='membership')
+    #invitation_form = InviteEmailsForm(request.form, prefix='invitations')
     if request.method == 'POST' and circle_form.validate() and membership_form.validate():
         circle = Circle(creator=g.user)
         circle_form.populate_obj(circle)
@@ -222,10 +326,11 @@ def new_circle():
         membership_form.populate_obj(membership)
         db.session.add(membership)
 
+        # TODO: create invitations and send emails to all the invited folks
+
         db.session.commit()
         return redirect(url_for('show_circle', id=circle.id))
-
-    return render('new_circle.html', circle_form=circle_form, membership_form=membership_form)
+    return render('new_circle.html', circle_form=circle_form, membership_form=membership_form) #, invitation_form=invitation_form)
 
 @app.route('/circles/<int:id>/comments', methods=['POST'])
 def new_comment(id):
@@ -247,14 +352,27 @@ def new_comment(id):
 
         return redirect(url_for('show_circle',id=circle.id))
 
-class LoginForm(Form):
-    login = TextField('Login name', [validators.Required()],
-        description='This name is only used for logging in to the site.  No one will ever see it.')
-    password = PasswordField('Password', [validators.Required()])
+def set_current_user(user):
+    if user is None:
+        web_session['user_id'] = None
+    else: 
+        web_session['user_id'] = user.id
     
+
 
 @app.route('/login', methods=['GET','POST'])
 def login():
+    # Some complex logic here.  If you are already logged in and have credentials,
+    # you shouldn't be able to log in again.  But if you don't have credentials yet,
+    # your login will associate them with your current account.
+
+    merge_users = False
+    if g.user:
+        if g.user.credentials:
+            abort(404)
+        else:
+            merge_users = True
+
     form = LoginForm(request.form)
     if request.method == 'POST' and form.validate():
         action = request.form.get('action',None)
@@ -265,7 +383,7 @@ def login():
             if not credentials:
                 form.login.errors.append("This login doesn't exist yet.")
             elif credentials.check_password(password):
-                web_session['user_id'] = credentials.user.id
+                set_current_user(credentials.user)
                 # flash successful login
                 return redirect(url_for('front'))
             else:
@@ -275,14 +393,18 @@ def login():
             if credentials:
                 form.login.errors.append("This login already exists.")
             else:
-                user = User()
+                if merge_users:
+                    user = g.user
+                else:
+                    user = User()
                 credentials = PasswordCredentials(user=user, login=login)
                 credentials.set_password(password)
 
                 db.session.add(user)
                 db.session.add(credentials)
                 db.session.commit()
-                web_session['user_id'] = user.id
+                set_current_user(user)
+                return redirect(url_for('front'))
         else:
             return "Something is not right"
 
@@ -290,7 +412,7 @@ def login():
 
 @app.route('/logout')
 def logout():
-    web_session['user_id'] = None
+    set_current_user(None)
     return redirect(url_for('front'))
 
 if __name__ == "__main__":

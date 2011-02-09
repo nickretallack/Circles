@@ -1,7 +1,10 @@
 html {font-family:helvetica}
+body {max-width:1000px; margin:auto}
 a {color:blue; cursor:pointer; text-decoration:none}
 a:hover {text-decoration:underline}
 ul {margin:0; padding:0; list-style:none}
 .discussion {background-color:#eee; margin:1ex; padding:0}
 .thread {margin-left:5ex}
-input[type=text], textarea {font-family:inherit; font-size:inherit}
+input[type=text], input[type=password], textarea {font-family:inherit; font-size:inherit; min-width:20ex}
+textarea.link {min-width:80ex; height:1em}
+

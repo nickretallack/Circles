@@ -1,3 +1,11 @@
+Todo:
+    * Invitations
+    Change your name in a circle (and other settings in the future)
+    
+
+
+
+
 This is going to need private messages.  Those will exist within circles too.
 
 
@@ -10,3 +18,9 @@ Invitation:
 
 You might have an account already, or not.  Hm.  I need to handle logins now.
 Also figure out email.
+
+
+
+Nice to Have:
+    Expanding textareas
+    SwfUpload / multi-upload support

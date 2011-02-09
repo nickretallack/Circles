@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% from 'forms.html' import form_field %}
+
+{% block content %}
+<h1>{{invitation.inviter_name}} has invited you to {{invitation.circle.name}}</h1>
+
+<form action="{{url_for('invitation', id=invitation.id)}}" method="POST">
+{% for field in form %}
+{{ form_field(field) }}
+{% endfor %}
+
+<button>Accept Invitation</button>
+</form>
+
+{% endblock %}
