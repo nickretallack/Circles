@@ -18,6 +18,19 @@
 <p>Or ask your friends to invite you to one.</p>
 {% endif %}
 
+{% if invitations %}
+<h2>Invitations</h2>
+<ul>{% for invitation_set in invitations %}
+<li>
+    {% for invitation in invitation_set %}
+        {{invitation.inviter_name}}, 
+    {% endfor %}
+        invited you to <a href="{{invitation_set.circle.url}} ">{{ invitation_set.circle.name }}</a>
+{% endfor %}</ul>
+{% endif %}
+
+
+
 {% else %}
 <p><a href="{{url_for('login')}}">Login or register to start a circle</a></p>
 <p>Or ask your friends to invite you to one.</p>

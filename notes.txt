@@ -1,6 +1,10 @@
 Todo:
     * Invitations
+        Handle the case where you're logged in when you receive one?  Is this different?  Nah.
+    Make it so when you log in it takes you back to the previous page if there was one
+        Put the referer in a hidden field in the login form
     Change your name in a circle (and other settings in the future)
+    Mark people as trusted when they accept each other's invitations
     
 
 

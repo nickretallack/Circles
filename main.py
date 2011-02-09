@@ -1,4 +1,4 @@
-from flask import Flask, render_template as render, request,  g, redirect, session as web_session, url_for
+from flask import Flask, render_template as render, request,  g, redirect, session as web_session, url_for, abort, json, flash
 from flaskext.sqlalchemy import SQLAlchemy
 from flaskext.mail import Mail
 from werkzeug import generate_password_hash, check_password_hash
@@ -104,6 +104,9 @@ class Circle(db.Model):
 
     creator = db.relationship(User, backref='circles_created')
 
+    def get_membership(user):
+        return self.memberships.filter(CircleMembership.user == user).first()
+
     @property
     def url(self):
         return url_for('show_circle', id=self.id)
@@ -206,11 +209,11 @@ class Invitation(db.Model):
 
     @property
     def inviter_name(self):
-        return db.session.query(CircleMembership).filter(db._and(CircleMembership.circle == self.circle, CircleMembership.user == self.inviter)).first().nickname
+        return db.session.query(CircleMembership).filter(db.and_(CircleMembership.circle == self.circle, CircleMembership.user == self.inviter)).first().nickname
     
     @property
     def acceptor_name(self):
-        return db.session.query(CircleMembership).filter(db._and(CircleMembership.circle == self.circle, CircleMembership.user == self.acceptor)).first().nickname
+        return db.session.query(CircleMembership).filter(db.and_(CircleMembership.circle == self.circle, CircleMembership.user == self.acceptor)).first().nickname
 
     def __init__(self, **kwargs):
         self.id = make_invitation_id()
@@ -243,11 +246,12 @@ class CreateCircleForm(Form):
     name = TextField('Name your Circle', [validators.Length(min=2, max=80)])
     description = TextAreaField('Describe it')
     # TODO: implement private circles later.  Or maybe they're all private for now?
-    
+
+
 class CommentForm(Form):
     text = TextAreaField('Comment')
-    parent_id = HiddenField()#IntegerField(widget=widgets.HiddenInput())
-    discussion_id = HiddenField()#IntegerField(widget=widgets.HiddenInput())
+    parent_id = HiddenField() #IntegerField(widget=widgets.HiddenInput())
+    discussion_id = HiddenField() #IntegerField(widget=widgets.HiddenInput())
     
 class LoginForm(Form):
     login = TextField('Login name', [validators.Required()],
@@ -266,6 +270,11 @@ def set_current_user():
     else:
         g.user = None
 
+@app.before_request
+def check_invitations():
+    g.invitations = json.loads(web_session.get('invitations','{}'))
+
+
 from flaskext.mail import Message
 
 @app.route("/")
@@ -276,7 +285,9 @@ def front():
 #    mail.send(msg)
 
     your_circles = db.session.query(Circle).join(CircleMembership).filter(CircleMembership.user == g.user)
-    return render('front.html', your_circles=your_circles)
+    invitations = get_active_invitations()
+    
+    return render('front.html', your_circles=your_circles, invitations=invitations)
 
 @app.route('/circles/<int:id>/invite')
 def invite(id):
@@ -286,9 +297,25 @@ def invite(id):
     invitations = invitations_for_circle(circle).all()
     return render('invite.html', circle=circle, invitations=invitations)
 
+def clicked_invitation(invitation):
+    invitation.clicked = True
+    circle_id = str(invitation.circle_id)
+    if circle_id not in g.invitations:
+        g.invitations[circle_id] = []
+    g.invitations[circle_id].append(invitation.id)
+    web_session['invitations'] = json.dumps(g.invitations)
+
 @app.route('/invitation/<string:id>', methods=['GET','POST'])
 def invitation(id):
     invitation = get_required(Invitation, id)
+    clicked_invitation(invitation)
+    return redirect(invitation.circle.url)
+    # If you have an invitation, that grants you a key to read anything in the group,
+    # but you can't write anything until you create your credentials.
+    # I'd love to let you write stuff, but it'd be complicated to merge things if you
+    # forgot to log in and ended up with two memberships to the same group.
+
+
     form = JoinCircleForm(request.form)
     if request.method == 'POST' and form.validate():
         # We create an honorary user so you can browse a bit before you create your credentials
@@ -303,13 +330,25 @@ def invitation(id):
         return redirect(invitation.circle.url)
     return render('invitation.html', invitation=invitation, form=form)
 
+def check_access(circle):
+    """To see a circle, you must have a membership or an invitation"""
+    membership = db.session.query(CircleMembership).filter(db.and_(CircleMembership.circle == circle, CircleMembership.user == g.user)).first()
+    if membership:
+        return True
+    else:
+        if str(circle.id) in g.invitations:
+            return False
+        else:
+            abort(404)
+
 @app.route('/circles/<int:id>')
 def show_circle(id):
     circle = required(db.session.query(Circle).filter_by(id=id).first())
-    discussion_form = CommentForm(request.form, discussion_id=5)
+    has_membership = check_access(circle)
+    discussion_form = CommentForm(request.form)
     discussions = db.session.query(Discussion).filter_by(circle_id=circle.id).options(db.joinedload(Discussion.comments)).all()
     
-    return render('circle.html', circle=circle, discussion_form=discussion_form, discussions=discussions)
+    return render('circle.html', circle=circle, discussion_form=discussion_form, discussions=discussions, has_membership=has_membership)
     
 @app.route('/circles/new', methods=['GET','POST'])
 def new_circle():
@@ -332,25 +371,74 @@ def new_circle():
         return redirect(url_for('show_circle', id=circle.id))
     return render('new_circle.html', circle_form=circle_form, membership_form=membership_form) #, invitation_form=invitation_form)
 
+def get_active_invitations():
+    results = []
+    for circle_id, invitation_ids in g.invitations.iteritems():
+        circle = Circle.query.get(circle_id)
+        invitations = get_active_invitations_for_circle(circle_id)
+        results.append({'circle':circle, 'invitations':invitations})
+    return results 
+
+
+def get_active_invitations_for_circle(circle_id):
+    return db.session.query(Invitation).filter(Invitation.id.in_(g.invitations[str(circle_id)]))
+
+@app.route('/circles/<int:id>/join', methods=['GET','POST'])
+def join_circle(id):
+    circle = get_required(Circle, id)
+    required(str(circle.id) in g.invitations)
+
+    if not g.user:
+        flash("Before you can join a circle, you must be logged in")
+        return redirect(url_for('login'))
+
+    invitations = get_active_invitations_for_circle(circle.id)
+    form = JoinCircleForm(request.form)
+
+    if request.method == 'POST' and form.validate():
+        nickname = form.nickname.data
+	membership = CircleMembership(circle=circle, user=g.user)
+        form.populate_obj(membership)
+        db.session.add(membership)
+        db.session.commit()
+
+        # delete the temporary invitation
+        g.invitations[str(circle.id)] = []
+        web_session['invitations'] = json.dumps(g.invitations)
+
+        flash("You're a member now!  Your nickname here is %s" % nickname)
+        return redirect(circle.url)
+
+    return render('join_circle.html', circle=circle, form=form, invitations=invitations)
+
+def parse_integer(integer):
+    if not integer:
+        return None
+    else:
+        return int(integer)
+
 @app.route('/circles/<int:id>/comments', methods=['POST'])
 def new_comment(id):
     circle = required(db.session.query(Circle).filter_by(id=id).first())
+    check_access(circle)
     form = CommentForm(request.form)
     if request.method == 'POST' and form.validate():
-        discussion_id = form.discussion_id.data
-        parent_id = form.parent_id.data
+        discussion_id = parse_integer(form.discussion_id.data)
+        parent_id = parse_integer(form.parent_id.data)
+        text = form.text.data
 
+        import pdb; pdb.set_trace()
         if discussion_id:
             discussion = db.session.query(Discussion).filter_by(id=discussion_id).first()
         else:
             discussion = Discussion(circle=circle)
             db.session.add(discussion)
 
-        comment = Comment(discussion=discussion, parent_id=form.parent_id.data, text=form.text.data, user=g.user)
+        comment = Comment(discussion=discussion, parent_id=parent_id, text=text, user=g.user)
         db.session.add(comment)
         db.session.commit()
 
-        return redirect(url_for('show_circle',id=circle.id))
+    return redirect(url_for('show_circle',id=circle.id))
 
 def set_current_user(user):
     if user is None:
@@ -362,17 +450,6 @@ def set_current_user(user):
 
 @app.route('/login', methods=['GET','POST'])
 def login():
-    # Some complex logic here.  If you are already logged in and have credentials,
-    # you shouldn't be able to log in again.  But if you don't have credentials yet,
-    # your login will associate them with your current account.
-
-    merge_users = False
-    if g.user:
-        if g.user.credentials:
-            abort(404)
-        else:
-            merge_users = True
-
     form = LoginForm(request.form)
     if request.method == 'POST' and form.validate():
         action = request.form.get('action',None)
@@ -393,10 +470,7 @@ def login():
             if credentials:
                 form.login.errors.append("This login already exists.")
             else:
-                if merge_users:
-                    user = g.user
-                else:
-                    user = User()
+                user = User()
                 credentials = PasswordCredentials(user=user, login=login)
                 credentials.set_password(password)
 

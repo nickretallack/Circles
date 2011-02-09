@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% from 'forms.html' import form_field %}
+
+{% block content %}
+<h1>Join <a href="{{circle.url}}">{{circle.name}}</a></h1>
+
+<form action="{{url_for('join_circle', id=circle.id)}}" method="POST">
+<p>You've received invitations from these people.</p>
+<ul>{% for invitation in invitations %}
+<li>{{invitation.inviter_name}}
+{% endfor %}</ul>
+
+{% for field in form %}
+{{ form_field(field) }}
+{% endfor %}
+
+<button>Join this Circle</button>
+</form>
+
+{% endblock %}
