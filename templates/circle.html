@@ -27,7 +27,7 @@
 
 <ul >{% for discussion in discussions %}
 <li class="discussion"><ul> {% for comment in discussion.root_comments recursive %}
-<li>{{ comment.text }}
+<li>{{comment.nickname}} says: {{ comment.text }}
 {{ comment_form(comment.reply_form) }}
 {% if comment.children %}
 <ul class="thread">{{ loop(comment.children) }}</ul>

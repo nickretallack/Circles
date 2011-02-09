@@ -163,6 +163,10 @@ class Comment(db.Model):
     user = db.relationship(User, backref='comments')
 
     @property
+    def nickname(self):
+        return db.session.query(CircleMembership).filter(db.and_(CircleMembership.user == self.user, CircleMembership.circle == self.discussion.circle)).first().nickname
+
+    @property
     def reply_form(self):
         form = CommentForm(parent_id=self.id, discussion_id=self.discussion.id)
         return form
@@ -435,7 +439,6 @@ def new_comment(id):
         parent_id = parse_integer(form.parent_id.data)
         text = form.text.data
 
-        import pdb; pdb.set_trace()
         if discussion_id:
             discussion = db.session.query(Discussion).filter_by(id=discussion_id).first()
         else:
