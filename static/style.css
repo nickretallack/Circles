@@ -6,10 +6,11 @@ ul {margin:0; padding:0; list-style:none}
 .thread {margin-left:3%}
 input[type=text], input[type=password], textarea {font-family:inherit; font-size:inherit; min-width:20ex}
 input[type=text], input[type=password] {width:30ex}
-textarea.link {min-width:80ex; height:1em}
 .notice {border:1px solid green; background-color:lightgreen; padding:.5ex}
 .comment-meta {font-size:12pt}
 .comment {margin-top:1ex}
 .reply-trigger, .cancel-reply {margin-left:.5ex}
 textarea {width:100%; display:block}
 .form_field {margin-bottom:1ex}
+.invitation-link {font-size:16pt}
+.invitation-link textarea {min-width:50ex; height:2em; border:none}

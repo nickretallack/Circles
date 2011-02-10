@@ -211,6 +211,7 @@ class Invitation(db.Model):
     circle_id = db.Column(db.Integer, db.ForeignKey('circles.id'))
     inviter_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     acceptor_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    clicked = db.Column(db.Boolean, default=False, nullable=False)
 
     inviter = db.relationship(User, backref='invitations', primaryjoin=inviter_id == User.id)
     acceptor = db.relationship(User, backref='invitations_accepted', primaryjoin=acceptor_id == User.id)
@@ -305,6 +306,7 @@ def front():
 @app.route('/circles/<int:id>/invite')
 def invite(id):
     circle = required(db.session.query(Circle).filter_by(id=id).first())
+    check_access(circle, membership_required=True)
     make_invitations(circle)
     db.session.commit()
     invitations = invitations_for_circle(circle).all()
@@ -320,37 +322,28 @@ def clicked_invitation(invitation):
 
 @app.route('/invitation/<string:id>', methods=['GET','POST'])
 def invitation(id):
+    """ If you have an invitation, that grants you a key to read anything in the group,
+    but you can't write anything until you create your credentials.
+    I'd love to let you write stuff, but it'd be complicated to merge things if you
+    forgot to log in and ended up with two memberships to the same group."""
     invitation = get_required(Invitation, id)
     if g.user == invitation.inviter:
         flash("You can't send an invitation to yourself")
         return redirect(url_for('front'))
+    if invitation.acceptor_id:
+        flash("This invitation has already been used")
+        return redirect(url_for('front'))
     clicked_invitation(invitation)
+    db.session.commit()
     return redirect(invitation.circle.url)
-    # If you have an invitation, that grants you a key to read anything in the group,
-    # but you can't write anything until you create your credentials.
-    # I'd love to let you write stuff, but it'd be complicated to merge things if you
-    # forgot to log in and ended up with two memberships to the same group.
 
-
-    form = JoinCircleForm(request.form)
-    if request.method == 'POST' and form.validate():
-        # We create an honorary user so you can browse a bit before you create your credentials
-        user = User()
-        invitation.acceptor = user
-        membership = CircleMembership(user=user, circle=invitation.circle, nickname=form.nickname.data)
-        
-        db.session.add(user)
-        db.session.add(membership)
-        db.session.commit()
-        set_current_user(user)
-        return redirect(invitation.circle.url)
-    return render('invitation.html', invitation=invitation, form=form)
-
-def check_access(circle):
+def check_access(circle, membership_required=False):
     """To see a circle, you must have a membership or an invitation"""
     membership = db.session.query(CircleMembership).filter(db.and_(CircleMembership.circle == circle, CircleMembership.user == g.user)).first()
     if membership:
         return True
+    elif membership_required:
+        abort(404)
     else:
         if str(circle.id) in g.invitations:
             return False
@@ -397,7 +390,12 @@ def get_active_invitations():
 
 
 def get_active_invitations_for_circle(circle_id):
-    return db.session.query(Invitation).filter(Invitation.id.in_(g.invitations[str(circle_id)]))
+    circle_id = str(circle_id)
+    invitation_ids = g.invitations.get(circle_id, None)
+    if invitation_ids:
+        return db.session.query(Invitation).filter(Invitation.id.in_(invitation_ids))
+    else:
+        return []
 
 @app.route('/circles/<int:id>/join', methods=['GET','POST'])
 def join_circle(id):

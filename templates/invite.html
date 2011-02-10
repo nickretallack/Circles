@@ -7,9 +7,14 @@
 <table>
 <tr><th>Link <th>Status
 {% for invitation in invitations %}
-<tr><td> <textarea readonly class="link">{{invitation.url}}</textarea>
+<tr><td class="invitation-link"> 
+    {% if not invitation.acceptor_id %}
+    <textarea readonly class="link" >{{invitation.url}}</textarea>
+    {% endif %}
     <td>
-    {% if invitation.acceptor %}
+    {% if invitation.clicked %}
+        Clicked
+    {% elif invitation.acceptor_id %}
         Accepted by {{invitation.acceptor_name}}
     {% else %}    
         Fresh
