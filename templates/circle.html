@@ -7,8 +7,8 @@
 {% macro comment_form(form) %}
 {% if has_membership %}
 <form action="{{url_for('new_comment', id=circle.id)}}" method="POST">
-<div>{{form.text}}</div>
 {{form.discussion_id}} {{form.parent_id}}
+{{form.text}}
 <button>Post</button>
     {% if form.discussion_id.data %}
         <a class="comment-meta cancel-reply">Cancel</a>
