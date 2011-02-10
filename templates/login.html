@@ -2,11 +2,14 @@
 {% from 'forms.html' import form_field %}
 
 {% block content %}
+<h1>Login or Register</h1>
+
+<p>Your login name will only be used for logging in to the site.  No one else will ever see it.</p>
 
 <form action="{{url_for('login')}}" method="POST">
-{% for field in form %}
-{{ form_field(field) }}
-{% endfor %}
+{{ form_field(form.login) }}
+{{ form_field(form.password) }}
+{{ form.next }}
 <button name="action" value="login">Login</button> or 
 <button name="action" value="register">Register</button>
 </form>

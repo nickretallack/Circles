@@ -267,8 +267,7 @@ class CommentForm(Form):
     discussion_id = HiddenField() #IntegerField(widget=widgets.HiddenInput())
     
 class LoginForm(Form):
-    login = TextField('Login name', [validators.Required()],
-        description='This name is only used for logging in to the site.  No one will ever see it.')
+    login = TextField('Login name', [validators.Required()])
     password = PasswordField('Password', [validators.Required()])
     next = HiddenField()
     
@@ -537,4 +536,4 @@ def show_member(circle_id, member_id):
     return render('member.html', member=member)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')
