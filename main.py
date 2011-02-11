@@ -111,6 +111,7 @@ class Circle(db.Model):
     def url(self):
         return url_for('show_circle', id=self.id)
 
+# TODO: rename to just Member
 class CircleMembership(db.Model):
     __tablename__ = 'user_circles'
     id = db.Column(db.Integer, primary_key=True)
@@ -121,6 +122,23 @@ class CircleMembership(db.Model):
 
     user = db.relationship(User, backref='memberships')
     circle = db.relationship(Circle, backref='memberships')
+
+    @classmethod
+    def find(self, circle, user=None):
+        if not user:
+            user = g.user
+        return db.session.query(CircleMembership).filter(
+            CircleMembership.user == g.user, CircleMembership.circle == circle)
+    
+    @property
+    def private_discussions_with_you(self):
+        you = self.find(g.user, self.circle)
+        return private_discussions_with(you)
+
+    def private_discussions_with(self, member):
+        return db.session.query(PrivateDiscussion).filter(db.or_(
+            db.and_(PrivateDiscussion.member1 == self, PrivateDiscussion.member2 == member),
+            db.and_(PrivateDiscussion.member1 == member, PrivateDiscussion.member2 == self)))
 
     @property
     def url(self):
@@ -140,7 +158,14 @@ class PhotoRelationship(db.Model): # - tags users in photos
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
     relationship = db.Column(db.String(20), primary_key=True) # (uploaded, drew, for, in, from)
 
-class PhotoCircles(db.Model): # -- determines whether the photo is visible to a given circle
+class PrivateDiscussion(db.Model):
+    __tablename__ = 'private_discussion'
+    id = db.Column(db.Integer, primary_key=True)
+    member1_id = db.Column(db.Integer, db.ForeignKey('user_circles.id'))
+    member2_id = db.Column(db.Integer, db.ForeignKey('user_circles.id'))
+    #discussion_id = db.Column(db.
+
+class PhotoCircle(db.Model): # -- determines whether the photo is visible to a given circle
     __tablename__ = 'photo_circles'
     photo_id = db.Column(db.Integer, db.ForeignKey('photos.id'), primary_key=True)
     circle_id = db.Column(db.Integer, db.ForeignKey('circles.id'), primary_key=True)
@@ -435,6 +460,24 @@ def parse_integer(integer):
     else:
         return int(integer)
 
+# TODO: make a generic discussion reply thing
+@app.route('/discussion/<int:discussion_id>', methods=['POST'])
+def discuss(discussion_id):
+    discussion = get_required(Discussion, discussion_id)
+    form = CommentForm(request.form)
+    parent_id = parse_integer(form.parent_id.data)
+    text = form.text.data
+    comment = Comment(discussion=discussion, parent_id=parent_id, text=text, user=g.user)
+    db.session.add(comment)
+    db.session.commit()
+    if request.referer:
+        return redirect(request.referrer)
+    else:
+        return 'OK' # Could redirect somewhere smart I suppose
+    
+    
+
+
 @app.route('/circles/<int:id>/comments', methods=['POST'])
 def new_comment(id):
     circle = required(db.session.query(Circle).filter_by(id=id).first())
@@ -532,6 +575,19 @@ def show_member(circle_id, member_id):
     member = get_required(CircleMembership, member_id)
     check_access(circle)
     return render('member.html', member=member)
+
+@app.route('/members/<int:member_id>/comments', methods=['POST'])
+def new_private_discussion(member_id):
+    member = get_required(CircleMembership, member_id)
+    circle = member.circle
+    you = required(CircleMembership.find(circle))
+    form = CommentForm(request.form)
+    if request.method == 'POST' and form.validate():
+        discussion_id = parse_integer(form.discussion_id.data)
+        parent_id = parse_integer(form.parent_id.data)
+        text = form.text.data
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0')
