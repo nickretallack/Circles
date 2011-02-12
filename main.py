@@ -105,14 +105,14 @@ class Circle(db.Model):
     creator = db.relationship(User, backref='circles_created')
 
     def get_membership(user):
-        return self.memberships.filter(CircleMembership.user == user).first()
+        return self.memberships.filter(Member.user == user).first()
 
     @property
     def url(self):
         return url_for('show_circle', id=self.id)
 
 # TODO: rename to just Member
-class CircleMembership(db.Model):
+class Member(db.Model):
     __tablename__ = 'user_circles'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
@@ -127,8 +127,8 @@ class CircleMembership(db.Model):
     def find(self, circle, user=None):
         if not user:
             user = g.user
-        return db.session.query(CircleMembership).filter(
-            CircleMembership.user == g.user, CircleMembership.circle == circle)
+        return db.session.query(Member).filter(
+            Member.user == g.user, Member.circle == circle)
     
     @property
     def private_discussions_with_you(self):
@@ -165,7 +165,7 @@ class PrivateDiscussion(db.Model):
     member2_id = db.Column(db.Integer, db.ForeignKey('user_circles.id'))
     #discussion_id = db.Column(db.
 
-class PhotoCircle(db.Model): # -- determines whether the photo is visible to a given circle
+class PublicDiscussion(db.Model): # -- determines whether the photo is visible to a given circle
     __tablename__ = 'photo_circles'
     photo_id = db.Column(db.Integer, db.ForeignKey('photos.id'), primary_key=True)
     circle_id = db.Column(db.Integer, db.ForeignKey('circles.id'), primary_key=True)
@@ -194,7 +194,7 @@ class Comment(db.Model):
 
     @property
     def membership(self):
-        return db.session.query(CircleMembership).filter(db.and_(CircleMembership.user == self.user, CircleMembership.circle == self.discussion.circle)).first()
+        return db.session.query(Member).filter(db.and_(Member.user == self.user, Member.circle == self.discussion.circle)).first()
 
     @property
     def nickname(self):
@@ -208,11 +208,10 @@ class Comment(db.Model):
 class Discussion(db.Model):
     __tablename__ = 'discussions'
     id = db.Column(db.Integer, primary_key=True)
-    circle_id = db.Column(db.Integer, db.ForeignKey('circles.id'))
-    circle = db.relationship('Circle', backref='discussions')
+    #circle_id = db.Column(db.Integer, db.ForeignKey('circles.id'))
+    #circle = db.relationship('Circle', backref='discussions')
 
     root_comments = db.relationship('Comment', primaryjoin='and_(Comment.discussion_id == Discussion.id, Comment.parent_id == None)')
-    
 
 # It needs events
 class Event(db.Model):
@@ -248,11 +247,11 @@ class Invitation(db.Model):
 
     @property
     def inviter_name(self):
-        return db.session.query(CircleMembership).filter(db.and_(CircleMembership.circle == self.circle, CircleMembership.user == self.inviter)).first().nickname
+        return db.session.query(Member).filter(db.and_(Member.circle == self.circle, Member.user == self.inviter)).first().nickname
     
     @property
     def acceptor_name(self):
-        return db.session.query(CircleMembership).filter(db.and_(CircleMembership.circle == self.circle, CircleMembership.user == self.acceptor)).first().nickname
+        return db.session.query(Member).filter(db.and_(Member.circle == self.circle, Member.user == self.acceptor)).first().nickname
 
     def __init__(self, **kwargs):
         self.id = make_invitation_id()
@@ -323,7 +322,7 @@ def front():
 #    msg.html = "<b>Yeah</b>"
 #    mail.send(msg)
 
-    your_circles = db.session.query(Circle).join(CircleMembership).filter(CircleMembership.user == g.user)
+    your_circles = db.session.query(Circle).join(Member).filter(Member.user == g.user)
     invitations = get_active_invitations()
     
     return render('front.html', your_circles=your_circles, invitations=invitations)
@@ -364,25 +363,25 @@ def invitation(id):
 
 def check_access(circle, membership_required=False):
     """To see a circle, you must have a membership or an invitation"""
-    membership = db.session.query(CircleMembership).filter(db.and_(CircleMembership.circle == circle, CircleMembership.user == g.user)).first()
-    if membership:
-        return True
+    member = db.session.query(Member).filter(db.and_(Member.circle == circle, Member.user == g.user)).first()
+    if member:
+        return member
     elif membership_required:
         abort(404)
     else:
         if str(circle.id) in g.invitations:
-            return False
+            return None
         else:
             abort(404)
 
 @app.route('/circles/<int:id>')
 def show_circle(id):
     circle = required(db.session.query(Circle).filter_by(id=id).first())
-    has_membership = check_access(circle)
+    member = check_access(circle)
     discussion_form = CommentForm(request.form)
     discussions = db.session.query(Discussion).filter_by(circle_id=circle.id).options(db.joinedload(Discussion.comments)).all()
     
-    return render('circle.html', circle=circle, discussion_form=discussion_form, discussions=discussions, has_membership=has_membership)
+    return render('circle.html', circle=circle, discussion_form=discussion_form, discussions=discussions, has_membership=member)
     
 @app.route('/circles/new', methods=['GET','POST'])
 def new_circle():
@@ -395,7 +394,7 @@ def new_circle():
         db.session.add(circle)
 
 	# create a membership for the creator
-	membership = CircleMembership(circle=circle, user=g.user)
+	membership = Member(circle=circle, user=g.user)
         membership_form.populate_obj(membership)
         db.session.add(membership)
 
@@ -436,7 +435,7 @@ def join_circle(id):
 
     if request.method == 'POST' and form.validate():
         nickname = form.nickname.data
-	membership = CircleMembership(circle=circle, user=g.user)
+	membership = Member(circle=circle, user=g.user)
         form.populate_obj(membership)
         db.session.add(membership)
         db.session.commit()
@@ -481,7 +480,7 @@ def discuss(discussion_id):
 @app.route('/circles/<int:id>/comments', methods=['POST'])
 def new_comment(id):
     circle = required(db.session.query(Circle).filter_by(id=id).first())
-    check_access(circle)
+    member = check_access(circle)
     form = CommentForm(request.form)
     if request.method == 'POST' and form.validate():
         discussion_id = parse_integer(form.discussion_id.data)
@@ -572,15 +571,15 @@ def logout():
 @app.route('/circles/<int:circle_id>/members/<member_id>')
 def show_member(circle_id, member_id):
     circle = get_required(Circle, circle_id)
-    member = get_required(CircleMembership, member_id)
+    member = get_required(Member, member_id)
     check_access(circle)
     return render('member.html', member=member)
 
 @app.route('/members/<int:member_id>/comments', methods=['POST'])
 def new_private_discussion(member_id):
-    member = get_required(CircleMembership, member_id)
+    member = get_required(Member, member_id)
     circle = member.circle
-    you = required(CircleMembership.find(circle))
+    you = required(Member.find(circle))
     form = CommentForm(request.form)
     if request.method == 'POST' and form.validate():
         discussion_id = parse_integer(form.discussion_id.data)
