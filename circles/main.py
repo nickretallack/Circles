@@ -1,10 +1,11 @@
-from flask import Flask, render_template as render, request,  g, redirect, session as web_session, url_for, abort, json, flash
-from flaskext.sqlalchemy import SQLAlchemy
-from flaskext.mail import Mail
+from flask import render_template as render, request,  g, redirect, session as web_session, url_for, abort, json, flash
 from werkzeug import generate_password_hash, check_password_hash
 from werkzeug.datastructures import MultiDict
 from wtforms import *
 from uuid import uuid4 
+
+from circles import app, db
+
 
 def make_invitation_id():
     return uuid4().hex
@@ -17,24 +18,6 @@ def required(result):
 def get_required(model, id):
     return required(db.session.query(model).filter_by(id=id).first())
 
-app = Flask(__name__)
-app.secret_key = 'seeeecret'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgres://nick@localhost/circles'
-
-app.config.update(
-    MAIL_SERVER = 'smtp.gmail.com',
-    MAIL_PORT = 587,
-    MAIL_USE_TLS = True,
-    MAIL_USE_SSL = True,
-    MAIL_DEBUG = True,
-    MAIL_USERNAME = 'nickretallack',
-    MAIL_PASSWORD = 'Sporks27',
-    DEFAULT_MAIL_SENDER = 'nickretallack@gmail.com',
-    MAIL_FAIL_SILENTLY = False,
-)
-ADMINS = ['nickretallack@gmail.com']
-db = SQLAlchemy(app)
-mail = Mail(app)
 #if not app.debug:
 #    import logging
 #    from logging.handlers import SMTPHandler
@@ -143,6 +126,22 @@ class Member(db.Model):
     @property
     def url(self):
         return url_for('show_member', circle_id=self.circle_id, member_id=self.id)
+
+#class Posting(db.Model):
+#    __tablename__ = 'posting'
+#    id = db.Column(db.Integer, primary_key=True)
+#    association_id = db.Column(db.Integer, db.ForeignKey('posting_associations.id'))
+#    circle_id = db.Column(db.Integer, db.ForeignKey('circles.id'))
+#    discussion_id = db.Column(db.Integer, db.ForeignKey('discussions.id'))
+#    creator_id = db.Column(db.Integer, db.ForeignKey('members.id'))
+#
+#    type = db.Column(db.String(50))
+#    feedworthy = db.Column(db.Boolean, default=True)
+#
+#    circle = db.relationship(Circle, backref=db.backref('postings', order_by=id.desc()))
+#    discussion = db.relationship(Discussion, backref='posting', uselist=False)
+
+
 
 class Photo(db.Model):
     __tablename__ = 'photos'
