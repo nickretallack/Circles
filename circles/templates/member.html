@@ -2,6 +2,8 @@
 
 {% block content %}
 <h1>{{member.nickname}}</h1>
-
+{% if you == member %}
+<p>This is you.</p>
+{% endif %}
 
 {% endblock %}

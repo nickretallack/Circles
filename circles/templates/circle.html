@@ -4,19 +4,6 @@
 <a href="{{member.url}}">{{member.nickname}}</a>
 {% endmacro %}
 
-{% macro comment_form(form) %}
-{% if has_membership %}
-<form action="{{url_for('new_comment', id=circle.id)}}" method="POST">
-{{form.discussion_id}} {{form.parent_id}}
-{{form.text}}
-<button>Post</button>
-    {% if form.discussion_id.data %}
-        <a class="comment-meta cancel-reply">Cancel</a>
-    {% endif %}
-</form>
-{% endif %}
-{% endmacro %}
-
 {% block content %}
 <h1>{{circle.name}}</h1>
 <p>{{circle.description}}</p>
@@ -28,25 +15,39 @@
 {% endif %}
 
 <h2>Members:</h2>
-<ul>{% for membership in circle.memberships %}
-<li>{{member_link(membership)}}
+<ul>{% for member in circle.members %}
+<li>{{member_link(member)}}
 {% endfor %}</ul>
 
 <h2>Discussion</h2>
+
 {% if has_membership %}
-{{ comment_form(discussion_form) }}
+<form action="{{url_for('new_posting', circle_id=circle.id)}}" method="POST">
+{{discussion_form.text}}
+<button>Say it</button>
 </form>
 {% endif %}
 
 
-<ul >{% for discussion in discussions %}
-<li class="discussion"><ul> {% for comment in discussion.root_comments recursive %}
+<ul >{% for posting in postings %}
+<li class="discussion"><ul> {% for comment in posting.discussion.root_comments recursive %}
 <li class="comment"><div class="comment-text">{{ comment.text }}</div>
-    <div class="comment-meta">{{member_link(comment.membership)}} -
-         <a class="reply-trigger">reply</a></div>
-    <div class="reply">
-        {{ comment_form(comment.reply_form) }}
+    <div class="comment-meta">{{member_link(comment.member)}}
+        {% if has_membership %}
+            - <a class="reply-trigger">reply</a>
+        {% endif %}
     </div>
+    {% if has_membership %}
+        <div class="reply-form">
+            <form action="{{url_for('reply_to_posting', posting_id=posting.id)}}" method="POST">
+            {% set form = comment.reply_form %}
+            {{form.parent_id}}
+            {{form.text}}
+            <button>Say it</button>
+            <a class="comment-meta cancel-reply">Cancel</a>
+            </form>
+        </div>
+    {% endif %}
 {% if comment.children %}
 <ul class="thread">{{ loop(comment.children) }}</ul>
 {% endif %}
