@@ -1,8 +1,6 @@
 Todo:
-    Test with Fixtures
-        Make sure invitation and privacy system works
-    Private messages between members
-        Re-use Discussion for this, but don't let it show up publicly.
+    Bumpable Discussions
+        discussions should sort by the last-bumped date
     Mark people as trusted when they accept each other's invitations
 	But what if they're invited by multiple people?  Well, they know those people so they should all be trusted.
     Post comments with ajax
@@ -10,6 +8,10 @@ Todo:
     Post Photos
     
 Done:
+    Private messages between members
+        Re-use Discussion for this, but don't let it show up publicly.
+    Test with Fixtures
+        Make sure invitation and privacy system works
     Membership Settings
 	Change your name
     Invitations

@@ -1,9 +1,25 @@
 {% extends 'base.html' %}
+{% from 'discussion.html' import render_discussion %}
+{% from 'macros.html' import link %}
 
 {% block content %}
 <h1>{{member.nickname}}</h1>
+<p>Is a member of {{link(member.circle)}}</p>
 {% if you == member %}
 <p>This is you.</p>
 {% endif %}
+
+<h1>Private Messages</h1>
+{% if you and not you == member %}
+<form action="{{url_for('new_private_message', member_id=member.id)}}" method="POST">
+{{discussion_form.text}}
+<button>Say it</button>
+</form>
+{% endif %}
+
+<ul>{% for private_discussion in member.private_discussions_with_you %}
+{{render_discussion(private_discussion.discussion, url_for('reply_to_private_message', message_id=private_discussion.id), True)}}
+{% endfor %}</ul>
+
 
 {% endblock %}

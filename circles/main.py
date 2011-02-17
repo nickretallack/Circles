@@ -165,8 +165,17 @@ class Member(db.Model):
     
     @property
     def private_discussions_with_you(self):
-        you = self.find(g.user, self.circle)
-        return private_discussions_with(you)
+        you = self.find(circle=self.circle)
+        if self == you:
+            return self.private_discussions
+        else:
+            return self.private_discussions_with(you)
+
+    @property
+    def private_discussions(self):
+        return db.session.query(PrivateDiscussion).filter(db.or_(
+            PrivateDiscussion.member1 == self,
+            PrivateDiscussion.member2 == self))
 
     def private_discussions_with(self, member):
         return db.session.query(PrivateDiscussion).filter(db.or_(
@@ -268,7 +277,8 @@ def show_member(circle_id, member_id):
     circle = get_required(Circle, circle_id)
     member = get_required(Member, member_id)
     you = check_access(circle)
-    return render('member.html', member=member, you=you)
+    form = CommentForm()
+    return render('member.html', member=member, you=you, discussion_form=form)
 
 @app.route('/circles/<int:circle_id>/settings', methods=['GET','POST'])
 def member_settings(circle_id):
@@ -417,6 +427,21 @@ class PrivateDiscussion(db.Model):
     member2_id = db.Column(db.Integer, db.ForeignKey('members.id'))
     discussion_id = db.Column(None, db.ForeignKey('discussions.id'))
 
+    discussion = db.relationship('Discussion', backref='private_discussion', uselist=False)
+    member1 = db.relationship('Member', primaryjoin=member1_id == Member.id)
+    member2 = db.relationship('Member', primaryjoin=member2_id == Member.id)
+
+    def __init__(self, *args, **kwargs):
+        super(PrivateDiscussion, self).__init__(*args, **kwargs)
+        self.discussion = Discussion()
+
+    def other(self, member):
+        if member == self.member1:
+            return self.member2
+        else:
+            return self.member1
+
+
 class Comment(db.Model):
     __tablename__ = 'comments'
     id = db.Column(db.Integer, primary_key=True)
@@ -443,21 +468,36 @@ class CommentForm(Form):
     parent_id = HiddenField()
     
 def parse_integer(integer):
-    if not integer:
-        return None
-    else:
+    try:
         return int(integer)
+    except ValueError:
+        return None
 
-#@app.route('/members/<int:member_id>/comments', methods=['POST'])
-#def new_member_comment(member_id):
-#    member = get_required(Member, member_id)
-#    you = check_access(circle, True)
-#    circle = member.circle
-#    form = CommentForm(request.form)
-#    if request.method == 'POST' and form.validate():
-#        discussion_id = parse_integer(form.discussion_id.data)
-#        parent_id = parse_integer(form.parent_id.data)
-#        text = form.text.data
+@app.route('/members/<int:member_id>/comments', methods=['POST'])
+def new_private_message(member_id):
+    member = get_required(Member, member_id)
+    circle = member.circle
+    you = check_access(circle, True)
+    form = CommentForm(request.form)
+    if request.method == 'POST' and form.validate():
+        private_discussion = PrivateDiscussion(member1_id=member.id, member2_id=you.id)
+        post_comment(form, private_discussion.discussion, you)
+        db.session.commit()
+    
+    return redirect(member.url)
+        
+@app.route('/message/<int:message_id>', methods=['POST'])
+def reply_to_private_message(message_id):
+    message = get_required(PrivateDiscussion, message_id)
+    circle = message.member1.circle
+    you = check_access(circle, True)
+    member = message.other(you)
+    form = CommentForm(request.form)
+    if request.method == 'POST' and form.validate():
+        post_comment(form, message.discussion, you)
+        db.session.commit()
+    
+    return redirect(member.url)
 
 @app.route('/circles/<int:circle_id>/postings/', methods=['POST'])
 def new_posting(circle_id):

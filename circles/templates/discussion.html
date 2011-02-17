@@ -1,0 +1,25 @@
+{% from 'macros.html' import link %}
+{% macro render_discussion(discussion, action, editable) %}
+    <li class="discussion"><ul> {% for comment in discussion.root_comments recursive %}
+        <li class="comment"><div class="comment-text">{{ comment.text }}</div>
+            <div class="comment-meta">{{link(comment.member)}}
+                {% if editable %}
+                    - <a class="reply-trigger">reply</a>
+                {% endif %}
+            </div>
+            {% if editable %}
+                <div class="reply-form">
+                    <form action="{{action}}" method="POST">
+                    {% set form = comment.reply_form %}
+                    {{form.parent_id}}
+                    {{form.text}}
+                    <button>Say it</button>
+                    <a class="comment-meta cancel-reply">Cancel</a>
+                    </form>
+                </div>
+            {% endif %}
+        {% if comment.children %}
+        <ul class="thread">{{ loop(comment.children) }}</ul>
+        {% endif %}
+    {% endfor %}</ul>
+{% endmacro %}

@@ -1,5 +1,6 @@
 {% extends 'base.html'%}
 {% from 'macros.html' import link %}
+{% from 'discussion.html' import render_discussion %}
 
 {% block content %}
 <h1>{{circle.name}}</h1>
@@ -28,28 +29,8 @@
 
 
 <ul >{% for posting in postings %}
-<li class="discussion"><ul> {% for comment in posting.discussion.root_comments recursive %}
-<li class="comment"><div class="comment-text">{{ comment.text }}</div>
-    <div class="comment-meta">{{link(comment.member)}}
-        {% if has_membership %}
-            - <a class="reply-trigger">reply</a>
-        {% endif %}
-    </div>
-    {% if has_membership %}
-        <div class="reply-form">
-            <form action="{{url_for('reply_to_posting', posting_id=posting.id)}}" method="POST">
-            {% set form = comment.reply_form %}
-            {{form.parent_id}}
-            {{form.text}}
-            <button>Say it</button>
-            <a class="comment-meta cancel-reply">Cancel</a>
-            </form>
-        </div>
-    {% endif %}
-{% if comment.children %}
-<ul class="thread">{{ loop(comment.children) }}</ul>
-{% endif %}
-{% endfor %}</ul>
+
+{{ render_discussion(posting.discussion, url_for('reply_to_posting', posting_id=posting.id), has_membership)}}
 {% endfor %}</ul>
 
 {% endblock %}
