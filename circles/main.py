@@ -4,6 +4,7 @@ from werkzeug.datastructures import MultiDict
 from wtforms import *
 from uuid import uuid4 
 from association import association
+from datetime import datetime
 
 from circles import app, db
 
@@ -175,12 +176,13 @@ class Member(db.Model):
     def private_discussions(self):
         return db.session.query(PrivateDiscussion).filter(db.or_(
             PrivateDiscussion.member1 == self,
-            PrivateDiscussion.member2 == self))
+            PrivateDiscussion.member2 == self)).order_by(PrivateDiscussion.last_bumped.desc())
 
     def private_discussions_with(self, member):
         return db.session.query(PrivateDiscussion).filter(db.or_(
             db.and_(PrivateDiscussion.member1 == self, PrivateDiscussion.member2 == member),
-            db.and_(PrivateDiscussion.member1 == member, PrivateDiscussion.member2 == self)))
+            db.and_(PrivateDiscussion.member1 == member, PrivateDiscussion.member2 == self))
+            ).order_by(PrivateDiscussion.last_bumped.desc())
 
     @property
     def url(self):
@@ -218,7 +220,7 @@ def show_circle(id):
     circle = required(db.session.query(Circle).filter_by(id=id).first())
     you = check_access(circle)
     discussion_form = CommentForm(request.form)
-    postings = db.session.query(Posting).filter_by(circle_id=circle.id).order_by(Posting.id.desc()).all()
+    postings = db.session.query(Posting).filter_by(circle_id=circle.id).order_by(Posting.last_bumped.desc())
     
     return render('circle.html', circle=circle, discussion_form=discussion_form, postings=postings, has_membership=you)
     
@@ -426,6 +428,7 @@ class PrivateDiscussion(db.Model):
     member1_id = db.Column(db.Integer, db.ForeignKey('members.id'))
     member2_id = db.Column(db.Integer, db.ForeignKey('members.id'))
     discussion_id = db.Column(None, db.ForeignKey('discussions.id'))
+    last_bumped = db.Column(db.DateTime)
 
     discussion = db.relationship('Discussion', backref='private_discussion', uselist=False)
     member1 = db.relationship('Member', primaryjoin=member1_id == Member.id)
@@ -480,7 +483,8 @@ def new_private_message(member_id):
     you = check_access(circle, True)
     form = CommentForm(request.form)
     if request.method == 'POST' and form.validate():
-        private_discussion = PrivateDiscussion(member1_id=member.id, member2_id=you.id)
+        private_discussion = PrivateDiscussion(member1_id=member.id, member2_id=you.id, 
+            last_bumped=datetime.now())
         post_comment(form, private_discussion.discussion, you)
         db.session.commit()
     
@@ -494,6 +498,7 @@ def reply_to_private_message(message_id):
     member = message.other(you)
     form = CommentForm(request.form)
     if request.method == 'POST' and form.validate():
+        message.last_bumped = datetime.now()
         post_comment(form, message.discussion, you)
         db.session.commit()
     
@@ -505,7 +510,7 @@ def new_posting(circle_id):
     you = check_access(circle, True)
     form = CommentForm(request.form)
     if request.method == 'POST' and form.validate():
-        posting = Posting(circle=circle)
+        posting = Posting(circle=circle, last_bumped=datetime.now())
         no_media = NoMedia()
         no_media.postings.append(posting)
         db.session.add(posting)
@@ -529,8 +534,8 @@ def reply_to_posting(posting_id):
     you = check_access(circle, True)
     form = CommentForm(request.form)
     if request.method == 'POST' and form.validate():
-        discussion = posting.discussion
-        post_comment(form, discussion, you)
+        posting.last_bumped = datetime.now()
+        post_comment(form, posting.discussion, you)
         db.session.commit()
 
     return redirect(url_for('show_circle',id=circle.id))
@@ -543,6 +548,7 @@ class Posting(db.Model):
     circle_id = db.Column(db.Integer, db.ForeignKey('circles.id'))
     creator_id = db.Column(db.Integer, db.ForeignKey('members.id'))
     discussion_id = db.Column(db.Integer, db.ForeignKey('discussions.id'))
+    last_bumped = db.Column(db.DateTime)
 
     # polymorphism
     association_id = db.Column(db.Integer, db.ForeignKey('posting_associations.id'))
