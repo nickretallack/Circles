@@ -252,11 +252,10 @@ def join_circle(id):
         for invitation in invitations:
             invitation.acceptor = member
 
-        import pdb; pdb.set_trace()
         db.session.commit()
 
         # delete the temporary invitation
-        g.invitations[str(circle.id)] = []
+        del g.invitations[str(circle.id)]
         save_active_invitations()
 
         flash("You're a member now!  Your nickname here is %s." % nickname)

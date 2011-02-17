@@ -3,58 +3,33 @@ import tempfile
 import os
 import circles.main
 import circles
-from circles.main import db
+from circles.main import db, app
+from circles.main import *
 
-from fixture import DataSet, SQLAlchemyFixture, NamedDataStyle
 from werkzeug import generate_password_hash
 
-
-class PasswordCredentialsData(DataSet):
-    class joe_cred:
-        login='joe'
-        password=generate_password_hash('joe')
-    class bob_cred:
-        login='bob'
-        password=generate_password_hash('bob')
-
-class UserData(DataSet):
-    class joe:
-        credentials = [PasswordCredentialsData.joe_cred]
-    class bob:
-        credentials = [PasswordCredentialsData.bob_cred]
-
-class CircleData(DataSet):
-    class joe_circle:
-        id = 1
-        name = "Joe's Circle"
-        creator = UserData.joe
-
-class MemberData(DataSet):
-    class joe_member:
-        id = 1
-        circle = CircleData.joe_circle
-        user = UserData.joe
-        nickname = "Not Joe"
-
-class InvitationData(DataSet):
-    class joe_invitation:
-        id = 1
-        circle = CircleData.joe_circle
-        inviter = MemberData.joe_member
+from flaskext.testing import TestCase
 
 class FlaskTestCase(unittest.TestCase):
     def setUp(self):
-        circles.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite://'
-        self.app = circles.app.test_client()
+        self.app = app.test_client()
         db.create_all()
-        self.fixtures = SQLAlchemyFixture(env=circles.main, 
-            style=NamedDataStyle(), engine=db.engine)
-        data = self.fixtures.data(UserData, PasswordCredentialsData)
-        data.setup()
+
+        # fixtures
+        joe = User()
+        cred = PasswordCredentials(user=joe, login='joe')
+        cred.set_password('joe')
+        circle = Circle(name="Circle of Joe")
+        member = Member(circle=circle, user=joe, nickname='Not Joe')
+        invitation = Invitation(inviter=member, circle=circle)
+        db.session.add_all([joe,cred,circle,member,invitation])
+        db.session.commit()
+
+        self.circle = circle
+        self.invitation = invitation
 
     def tearDown(self):
         db.session.remove()
-        self.fixtures.dispose()
         db.drop_all()
 
     def register(self, *args):
@@ -84,39 +59,39 @@ class TestLogins(FlaskTestCase):
         
 
 class TestInvitations(FlaskTestCase):
-#    def setUp(self):
-#        super(TestInvitations, self).setUp()
-#
-#        # make a user for existing user tests
-#        self.register('fred','fred')
-#        self.logout()
-#
-#        # make a user with a circle and stay logged in as them
-#        self.register('joe','joe')
-#        rv = self.app.post('/circles/new', data={
-#            'circle-name':"joe's circle",
-#            'circle-description':"Circle of Joe",
-#            'member-nickname':'Jose',
-#        }, follow_redirects=True)
-    
-    def test_invite_new_user(self):
+    def test_visiting_your_circle(self):
         self.login('joe','joe')
-        import pdb; pdb.set_trace()
-        rv = self.app.get('/circles/%s' % CircleData.joe_circle.id)
-        print rv.data
+        rv = self.app.get('/circles/%s' % self.circle.id)
         assert rv.status_code == 200
-#        rv = self.app.get('/cicles/1/invite')
-#        print rv.data
-#        invitation = db.session.query(circles.main.Invitation).first()
-#        self.logout()
-#
-#        # visiting a url should give us access to the page
-#        rv = self.app.get(invitation.url)
-#        assert 'Circle of Joe' in rv.data
+
+        rv = self.app.get('/circles/%s/invite' % self.circle.id)
+        assert rv.status_code == 200
+
+    def test_inviting_someone(self):
+        with app.test_request_context():
+            url = self.invitation.url[len('http://localhost'):]
+
+        # Invite should give you access to joe's circle
+        rv = self.app.get(url, follow_redirects=True)
+        assert self.circle.name in rv.data
+        #assert 'form' not in rv.data # not logged in, so no forms
+
+        # See that this invitation is listed on the front page
+        rv = self.app.get('/')
+        assert 'invited you' in rv.data
+
+        # Try to join the group.  It makes you register
+        rv = self.app.get('/circles/%s/join' % self.circle.id, follow_redirects=True)
+        assert 'Login or Register' in rv.data
+        rv = self.register('bob','bob')
+        rv = self.app.get('/circles/%s/join' % self.circle.id, follow_redirects=True)
+        assert '<h1>Join' in rv.data
+        rv = self.app.post('/circles/%s/join' % self.circle.id, follow_redirects=True, data=dict(nickname='Bob'))
+        assert rv.status_code == 200
+
+        # make sure the invitation is cleared away
+        rv = self.app.get('/')
+        assert 'invited you' not in rv.data
         
-        
-
-
-
 if __name__ == '__main__':
     unittest.main()
