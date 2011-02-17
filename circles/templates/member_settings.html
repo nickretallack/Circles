@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% from 'macros.html' import link %}
+{% from 'forms.html' import form_field %}
+
+{% block content %}
+<h1>Membership Settings for {{link(circle)}}</h1>
+<form action="{{url_for('member_settings', circle_id=circle.id)}}" method="POST">
+{{form_field(form.nickname)}}
+<button>Save</button>
+</form>
+{% endblock %}

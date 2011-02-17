@@ -1,13 +1,17 @@
 Todo:
+    Test with Fixtures
+        Make sure invitation and privacy system works
     Private messages between members
         Re-use Discussion for this, but don't let it show up publicly.
-    Membership Settings
-	Change your name
     Mark people as trusted when they accept each other's invitations
 	But what if they're invited by multiple people?  Well, they know those people so they should all be trusted.
+    Post comments with ajax
     Make threads foldable
+    Post Photos
     
 Done:
+    Membership Settings
+	Change your name
     Invitations
         Handle the case where you're logged in when you receive one?  Is this different?  Nah.
     	Don't let people re-use the same invitation

@@ -108,7 +108,7 @@ def login():
                 db.session.add(credentials)
                 db.session.commit()
                 set_current_user(user)
-                flash("You are now registered and logged in as %s.  Don't forget your name and password, since we have no way of reminding you!")
+                flash("You are now registered and logged in as %s.  Don't forget your name and password, since we have no way of reminding you!" % login)
                 return redirect(form.next.data)
         else:
             return "Something is not right"
@@ -152,12 +152,16 @@ class Member(db.Model):
     user = db.relationship('User', backref='members')
     circle = db.relationship(Circle, backref='members')
 
+    @property
+    def name(self):
+        return self.nickname # I should probably rename this all over to be consistent
+
     @classmethod
     def find(self, circle, user=None):
         if not user:
             user = g.user
         return db.session.query(Member).filter(
-            Member.user == g.user, Member.circle == circle)
+            db.and_(Member.user == g.user, Member.circle == circle)).first()
     
     @property
     def private_discussions_with_you(self):
@@ -233,7 +237,7 @@ def join_circle(id):
     required(str(circle.id) in g.invitations)
 
     if not g.user:
-        flash("Before you can join a circle, you must be logged in")
+        flash("Before you can join a circle, you must be logged in.")
         return redirect(url_for('login'))
 
     invitations = get_active_invitations_for_circle(circle.id)
@@ -244,13 +248,18 @@ def join_circle(id):
 	member = Member(circle=circle, user=g.user)
         form.populate_obj(member)
         db.session.add(member)
+
+        for invitation in invitations:
+            invitation.acceptor = member
+
+        import pdb; pdb.set_trace()
         db.session.commit()
 
         # delete the temporary invitation
         g.invitations[str(circle.id)] = []
         save_active_invitations()
 
-        flash("You're a member now!  Your nickname here is %s" % nickname)
+        flash("You're a member now!  Your nickname here is %s." % nickname)
         return redirect(circle.url)
 
     return render('join_circle.html', circle=circle, form=form, invitations=invitations)
@@ -261,6 +270,20 @@ def show_member(circle_id, member_id):
     member = get_required(Member, member_id)
     you = check_access(circle)
     return render('member.html', member=member, you=you)
+
+@app.route('/circles/<int:circle_id>/settings', methods=['GET','POST'])
+def member_settings(circle_id):
+    circle = get_required(Circle, circle_id)
+    you = check_access(circle)
+    form = JoinCircleForm(request.form, you)
+    if request.method == 'POST' and form.validate():
+        nickname = form.nickname.data
+        form.populate_obj(you)
+        db.session.commit()
+        flash("Your nickname is now %s." % nickname)
+        return redirect(circle.url)
+
+    return render('member_settings.html', you=you, form=form, circle=circle)
 
 # -------------------------------- INVITATIONS -------------------------
 
@@ -285,7 +308,7 @@ class Invitation(db.Model):
 
     @property
     def inviter_name(self):
-        return inviter.nickname
+        return self.inviter.nickname
     
     @property
     def acceptor_name(self):
@@ -341,7 +364,7 @@ def invalidate_self_invitations(user):
         for invitation in invitation_set['invitations']:
             if invitation.inviter.user == user:
                 g.invitations[str(invitation.circle_id)].remove(invitation.id)
-                flash("Oops!  You opened one of your own invitations")
+                flash("Oops!  You opened one of your own invitations.")
     save_active_invitations()
 
     # This could also be used to establish trust with people who've
@@ -371,10 +394,10 @@ def invitation(id):
     forgot to log in and ended up with two members to the same circle."""
     invitation = get_required(Invitation, id)
     if g.user == invitation.inviter.user:
-        flash("You can't send an invitation to yourself")
+        flash("You can't send an invitation to yourself.")
         return redirect(url_for('front'))
     if invitation.acceptor_member_id:
-        flash("This invitation has already been used")
+        flash("This invitation has already been used.")
         return redirect(url_for('front'))
     clicked_invitation(invitation)
     db.session.commit()

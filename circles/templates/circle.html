@@ -1,8 +1,5 @@
 {% extends 'base.html'%}
-
-{% macro member_link(member) %}
-<a href="{{member.url}}">{{member.nickname}}</a>
-{% endmacro %}
+{% from 'macros.html' import link %}
 
 {% block content %}
 <h1>{{circle.name}}</h1>
@@ -10,13 +7,14 @@
 
 {% if has_membership %}
 <p><a href="{{url_for('invite',id=circle.id)}}">Invite people you trust</a></p>
+<p><a href="{{url_for('member_settings', circle_id=circle.id)}}">Edit your membership</a></p>
 {% else %}
 <p><a href="{{url_for('join_circle',id=circle.id)}}">Join this circle</a></p>
 {% endif %}
 
 <h2>Members:</h2>
 <ul>{% for member in circle.members %}
-<li>{{member_link(member)}}
+<li>{{link(member)}}
 {% endfor %}</ul>
 
 <h2>Discussion</h2>
@@ -32,7 +30,7 @@
 <ul >{% for posting in postings %}
 <li class="discussion"><ul> {% for comment in posting.discussion.root_comments recursive %}
 <li class="comment"><div class="comment-text">{{ comment.text }}</div>
-    <div class="comment-meta">{{member_link(comment.member)}}
+    <div class="comment-meta">{{link(comment.member)}}
         {% if has_membership %}
             - <a class="reply-trigger">reply</a>
         {% endif %}
