@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from 'macros.html' import link %}
 
 {% block content %}
 <h1>Invitations to <a href="{{circle.url}}">{{circle.name}}</a></h1>
@@ -12,10 +13,10 @@
     <textarea readonly class="link" >{{invitation.url}}</textarea>
     {% endif %}
     <td>
-    {% if invitation.clicked %}
+    {% if invitation.acceptor %}
+        Accepted by {{link(invitation.acceptor)}}
+    {% elif invitation.clicked %}
         Clicked
-    {% elif invitation.acceptor_id %}
-        Accepted by {{invitation.acceptor_name}}
     {% else %}    
         Fresh
     {% endif %}

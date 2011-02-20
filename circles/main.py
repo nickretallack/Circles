@@ -323,7 +323,7 @@ class Invitation(db.Model):
     
     @property
     def acceptor_name(self):
-        return acceptor.nickname
+        return self.acceptor.nickname
 
     def __init__(self, **kwargs):
         self.id = make_invitation_id()
@@ -337,10 +337,8 @@ def make_invitations(circle, count=10):
         invitation = Invitation(inviter=member, circle=circle)
         db.session.add(invitation)
 
-def invitations_for_circle(circle, user=None):
-    if not user:
-        user = g.user
-    return db.session.query(Invitation).filter(db.and_(Invitation.inviter == g.user, Invitation.circle == circle))
+def invitations_for_circle(circle, member):
+    return db.session.query(Invitation).filter(db.and_(Invitation.inviter == member, Invitation.circle == circle))
 
 def unused_invitations_for_circle(circle, user=None):
     return invitations_for_circle(circle, user).filter(Invitation.acceptor == None)
@@ -391,10 +389,10 @@ def check_invitations():
 @app.route('/circles/<int:id>/invite')
 def invite(id):
     circle = required(db.session.query(Circle).filter_by(id=id).first())
-    check_access(circle, member_required=True)
+    member = check_access(circle, member_required=True)
     make_invitations(circle)
     db.session.commit()
-    invitations = invitations_for_circle(circle).all()
+    invitations = invitations_for_circle(circle, member).all()
     return render('invite.html', circle=circle, invitations=invitations)
 
 @app.route('/invitation/<string:id>', methods=['GET','POST'])
