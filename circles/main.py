@@ -329,19 +329,17 @@ class Invitation(db.Model):
         self.id = make_invitation_id()
         super(Invitation, self).__init__(**kwargs)
 
-def make_invitations(circle, count=10):
-    unused_invitations_count = unused_invitations_for_circle(circle).count()
-
+def make_invitations(circle, member, count=10):
+    unused_invitations_count = unused_invitations_for_circle(circle, member).count()
     for index in xrange(count - unused_invitations_count):
-        member = Member.find(circle)
         invitation = Invitation(inviter=member, circle=circle)
         db.session.add(invitation)
 
 def invitations_for_circle(circle, member):
     return db.session.query(Invitation).filter(db.and_(Invitation.inviter == member, Invitation.circle == circle))
 
-def unused_invitations_for_circle(circle, user=None):
-    return invitations_for_circle(circle, user).filter(Invitation.acceptor == None)
+def unused_invitations_for_circle(circle, member):
+    return invitations_for_circle(circle, member).filter(Invitation.acceptor == None)
 
 def get_active_invitations():
     results = []
@@ -390,9 +388,9 @@ def check_invitations():
 def invite(id):
     circle = required(db.session.query(Circle).filter_by(id=id).first())
     member = check_access(circle, member_required=True)
-    make_invitations(circle)
+    make_invitations(circle, member)
     db.session.commit()
-    invitations = invitations_for_circle(circle, member).all()
+    invitations = invitations_for_circle(circle, member)
     return render('invite.html', circle=circle, invitations=invitations)
 
 @app.route('/invitation/<string:id>', methods=['GET','POST'])
