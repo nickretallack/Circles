@@ -12,7 +12,7 @@ import os.path
 from circles import app, db
 
 # Serve uploaded files
-app.add_url_rule('/uploads/<hash>/<filename>', 'uploaded_file', build_only=True)
+app.add_url_rule('/uploads/<variety>/<hash>/<filename>', 'uploaded_file', build_only=True)
 app.wsgi_app = SharedDataMiddleware(app.wsgi_app, {
     '/uploads':  app.config['UPLOAD_FOLDER']
 })
@@ -533,12 +533,12 @@ def new_posting(circle_id):
                 media = existing_photo
                 file.close()
             else:
-                media = Photo(hash=hash, filename=filename) # TODO: uploader
-                destination_directory = os.path.join(app.config['UPLOAD_FOLDER'],hash)
-                if not os.path.isdir(destination_directory):
-                    os.makedirs(destination_directory)
+                media = Photo(hash=hash, filename=filename) # TODO: who uploaded it?
+                import pdb; pdb.set_trace()
+                destination = media.file_path()
+                make_dirs_for(destination)
                 file.stream.seek(0) # The hasher already ran through the file.
-                file.save(os.path.join(destination_directory, filename))
+                file.save(destination)
         else:
             media = NoMedia()
 
@@ -627,6 +627,7 @@ class Location(db.Model):
     longitude = db.Column(db.Float)
 
 # ------------------------------ PHOTOS ----------------------------
+from PIL import Image
 
 class Photo(db.Model):
     __tablename__ = 'photos'
@@ -638,9 +639,23 @@ class Photo(db.Model):
     #uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id')) # -- handled by a relationship?  *shrug*  nah we can special case this.  Not member, since photos are global.
     #uploaded_at = db.Column(db.Date)
 
-    @property
-    def file_url(self):
-        return url_for('uploaded_file', hash=self.hash, filename=self.filename)
+    def file_url(self, variety='full'):
+        return url_for('uploaded_file', variety=variety, hash=self.hash, filename=self.filename)
+
+    def file_path(self, variety='full'):
+        return os.path.join(app.config['UPLOAD_FOLDER'], variety, self.hash, self.filename)
+
+    def thumbnail(self, width, height):
+        size = (width, height)
+        variety = '%sx%s' % size
+        thumbnail_path = self.file_path(variety)
+        full_path = self.file_path()
+        if not os.path.exists(thumbnail_path) and os.path.exists(full_path):
+            image = Image.open(full_path)
+            image.thumbnail((width,height))
+            make_dirs_for(thumbnail_path)
+            image.save(thumbnail_path)
+        return self.file_url(variety)
 
 postable(Photo, 'postings')
 
@@ -655,6 +670,9 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1] in app.config['ALLOWED_EXTENSIONS']
 
-
+def make_dirs_for(filename):
+    directory = os.path.dirname(filename)
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
 
 # -------------------------------- END  ------------------------------

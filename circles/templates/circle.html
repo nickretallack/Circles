@@ -31,7 +31,7 @@
 
 <ul >{% for posting in postings %}
 {% if posting.association.type == 'photos' %}
-<img src="{{posting.media.file_url}}">
+<img src="{{posting.media.thumbnail(200,200)}}">
 {% endif %}
 {{ render_discussion(posting.discussion, url_for('reply_to_posting', posting_id=posting.id), has_membership)}}
 {% endfor %}</ul>
