@@ -1,10 +1,15 @@
 Todo:
+    Logging / Error emails
     Post Photos
     Post comments with ajax
+    Login needs ajax to not destroy your password when you accidentally hit login but meant to hit register
     Make threads foldable
     Mark people as trusted when they accept each other's invitations
 	But what if they're invited by multiple people?  Well, they know those people so they should all be trusted.
-    
+    Add revision management to everything
+    Make everything editable    
+
+
 Done:
     Deploy this shiznit!
     Bumpable Discussions
