@@ -21,15 +21,18 @@
 <h2>Discussion</h2>
 
 {% if has_membership %}
-<form action="{{url_for('new_posting', circle_id=circle.id)}}" method="POST">
+<form action="{{url_for('new_posting', circle_id=circle.id)}}" method="POST" enctype="multipart/form-data">
 {{discussion_form.text}}
+<div>{{discussion_form.file.label}}: {{discussion_form.file}}</div>
 <button>Say it</button>
 </form>
 {% endif %}
 
 
 <ul >{% for posting in postings %}
-
+{% if posting.association.type == 'photos' %}
+<img src="{{posting.media.file_url}}">
+{% endif %}
 {{ render_discussion(posting.discussion, url_for('reply_to_posting', posting_id=posting.id), has_membership)}}
 {% endfor %}</ul>
 

@@ -1,12 +1,21 @@
 from flask import render_template as render, request,  g, redirect, session as web_session, url_for, abort, json, flash
-from werkzeug import generate_password_hash, check_password_hash
+from werkzeug import generate_password_hash, check_password_hash, secure_filename
 from werkzeug.datastructures import MultiDict
 from wtforms import *
 from uuid import uuid4 
+import hashlib
 from association import association
 from datetime import datetime
+from werkzeug import SharedDataMiddleware
+import os.path
 
 from circles import app, db
+
+# Serve uploaded files
+app.add_url_rule('/uploads/<hash>/<filename>', 'uploaded_file', build_only=True)
+app.wsgi_app = SharedDataMiddleware(app.wsgi_app, {
+    '/uploads':  app.config['UPLOAD_FOLDER']
+})
 
 @app.route("/")
 def front():
@@ -465,6 +474,7 @@ class Comment(db.Model):
 class CommentForm(Form):
     text = TextAreaField('Comment')
     parent_id = HiddenField()
+    file = FileField(u'Optional Image')
     
 def parse_integer(integer):
     try:
@@ -505,12 +515,39 @@ def new_posting(circle_id):
     circle = get_required(Circle, circle_id)
     you = check_access(circle, True)
     form = CommentForm(request.form)
+
     if request.method == 'POST' and form.validate():
+        # save the file afterwards
+        file = request.files['file']
+
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            hasher = hashlib.sha1()
+            for line in file.stream:
+                hasher.update(line)
+            hash = hasher.hexdigest()
+
+            # check if it already exists
+            existing_photo = db.session.query(Photo).filter_by(hash=hash).first()
+            if existing_photo:
+                media = existing_photo
+                file.close()
+            else:
+                media = Photo(hash=hash, filename=filename) # TODO: uploader
+                destination_directory = os.path.join(app.config['UPLOAD_FOLDER'],hash)
+                if not os.path.isdir(destination_directory):
+                    os.makedirs(destination_directory)
+                file.stream.seek(0) # The hasher already ran through the file.
+                file.save(os.path.join(destination_directory, filename))
+        else:
+            media = NoMedia()
+
         posting = Posting(circle=circle, last_bumped=datetime.now())
-        no_media = NoMedia()
-        no_media.postings.append(posting)
+        media.postings.append(posting)
         db.session.add(posting)
-        db.session.add(no_media)
+        db.session.add(media)
+
+        # only post comment if it exists
         post_comment(form, posting.discussion, you)
         db.session.commit()
     
@@ -561,18 +598,6 @@ class Posting(db.Model):
 
 postable = association(Posting, 'media')
 
-class Photo(db.Model):
-    __tablename__ = 'photos'
-    id = db.Column(db.Integer, primary_key=True)
-    posting_association_id = db.Column(db.Integer, db.ForeignKey('posting_associations.id'))
-
-    hash = db.Column(db.String(80))
-    filename = db.Column(db.String(80)) # - sanitized by werkzeug.  Place photos in <hash>/filename
-    uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id')) # -- handled by a relationship?  *shrug*  nah we can special case this
-    uploaded_at = db.Column(db.Date)
-
-postable(Photo, 'postings')
-
 class Event(db.Model):
     __tablename__ = 'events'
     id = db.Column(db.Integer, primary_key=True)
@@ -601,11 +626,35 @@ class Location(db.Model):
     latitude = db.Column(db.Float)
     longitude = db.Column(db.Float)
 
+# ------------------------------ PHOTOS ----------------------------
+
+class Photo(db.Model):
+    __tablename__ = 'photos'
+    id = db.Column(db.Integer, primary_key=True)
+    posting_association_id = db.Column(db.Integer, db.ForeignKey('posting_associations.id'))
+
+    hash = db.Column(db.String(80))
+    filename = db.Column(db.String(80)) # - sanitized by werkzeug.  Place photos in <hash>/filename
+    #uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id')) # -- handled by a relationship?  *shrug*  nah we can special case this.  Not member, since photos are global.
+    #uploaded_at = db.Column(db.Date)
+
+    @property
+    def file_url(self):
+        return url_for('uploaded_file', hash=self.hash, filename=self.filename)
+
+postable(Photo, 'postings')
+
 # not used yet
 class PhotoRelationship(db.Model): # - tags users in photos
     __tablename__ = 'photo_relationships'
     photo_id = db.Column(db.Integer, db.ForeignKey('photos.id'), primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
     relationship = db.Column(db.String(20), primary_key=True) # (uploaded, drew, for, in, from)
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1] in app.config['ALLOWED_EXTENSIONS']
+
+
 
 # -------------------------------- END  ------------------------------
