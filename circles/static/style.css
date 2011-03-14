@@ -15,3 +15,4 @@ textarea {width:100%; display:block}
 .invitation-link {font-size:16pt}
 .invitation-link textarea {min-width:50ex; height:2em; border:none}
 .discussion {border-bottom:1px solid #eee;  padding:1ex 0}
+.picture {text-align:center}

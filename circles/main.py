@@ -596,6 +596,10 @@ class Posting(db.Model):
         super(Posting, self).__init__(*args, **kwargs)
         self.discussion = Discussion()
 
+    @property
+    def photo_url(self):
+        return url_for('show_picture', posting_id=self.id)
+
 postable = association(Posting, 'media')
 
 class Event(db.Model):
@@ -674,5 +678,13 @@ def make_dirs_for(filename):
     directory = os.path.dirname(filename)
     if not os.path.isdir(directory):
         os.makedirs(directory)
+
+@app.route('/pictures/<int:posting_id>')
+def show_picture(posting_id):
+    posting = get_required(Posting, posting_id)
+    circle = posting.circle
+    you = check_access(circle, True)
+    return render('photo.html', circle=circle, posting=posting, you=you)
+
 
 # -------------------------------- END  ------------------------------

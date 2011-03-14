@@ -1,0 +1,8 @@
+{% extends 'base.html' %}
+{% from 'macros.html' import link %}
+
+{% block content %}
+<p>This picture was posted to {{link(circle)}}.</p>
+<div class="picture"><img src="{{posting.media.file_url()}}"></div>
+
+{% endblock %}
