@@ -17,3 +17,5 @@ textarea {width:100%; display:block}
 .posting {border-bottom:1px solid #eee; padding:1ex 0}
 .picture {text-align:center}
 .gallery li {display:inline-block; vertical-align:middle; margin:2px}
+.comment-text {white-space:pre-wrap}
+
