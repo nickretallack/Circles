@@ -231,7 +231,7 @@ def show_circle(id):
     discussion_form = CommentForm(request.form)
     postings = db.session.query(Posting).filter_by(circle_id=circle.id).order_by(Posting.last_bumped.desc())
     
-    return render('circle.html', circle=circle, discussion_form=discussion_form, postings=postings, has_membership=you)
+    return render('circle.html', circle=circle, discussion_form=discussion_form, postings=postings, you=you)
     
 @app.route('/circles/new', methods=['GET','POST'])
 def new_circle():

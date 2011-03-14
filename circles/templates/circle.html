@@ -6,10 +6,11 @@
 <h1>{{circle.name}}</h1>
 <p>{{circle.description}}</p>
 
-{% if has_membership %}
-<p><a href="{{url_for('invite',id=circle.id)}}">Invite people you trust</a></p>
-<p><a href="{{url_for('member_settings', circle_id=circle.id)}}">Edit your membership</a></p>
-<p><a href="{{url_for('picture_gallery', circle_id=circle.id)}}">See all the pictures</a>
+{% if you %}
+<p><a href="{{url_for('invite',id=circle.id)}}">Invite people you trust</a>.</p>
+<p><a href="{{url_for('member_settings', circle_id=circle.id)}}">Edit your membership</a>.</p>
+<p><a href="{{you.url}}">Check your private messages</a>.</p>
+<p><a href="{{url_for('picture_gallery', circle_id=circle.id)}}">See all the pictures</a>.</p>
 {% else %}
 <p><a href="{{url_for('join_circle',id=circle.id)}}">Join this circle</a></p>
 {% endif %}
@@ -21,8 +22,8 @@
 
 <h2>Discussion</h2>
 
-{% if has_membership %}
-<form action="{{url_for('new_posting', circle_id=circle.id)}}" method="POST" enctype="multipart/form-data">
+{% if you %}
+<form class="posting" action="{{url_for('new_posting', circle_id=circle.id)}}" method="POST" enctype="multipart/form-data">
 {{discussion_form.text}}
 <div>{{discussion_form.file.label}}: {{discussion_form.file}}</div>
 <button>Post it</button>
@@ -34,9 +35,9 @@
 {% set action = posting.reply_url %}
 <li class='posting'>{% if posting.association.type == 'photos' %}
 <a href="{{posting.photo_url}}"><img src="{{posting.media.thumbnail(200,200)}}"></a>
-{{ render_attribution(posting, action, has_membership) }}
+{{ render_attribution(posting, action, you) }}
 {% endif %}
-{{ render_discussion(posting.discussion, action, has_membership)}}
+{{ render_discussion(posting.discussion, action, you)}}
 {% endfor %}</ul>
 
 {% endblock %}

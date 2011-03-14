@@ -3,7 +3,7 @@
 {% from 'discussion.html' import render_discussion %}
 
 {% block content %}
-<p>This picture was posted to {{link(circle)}}.</p>
+<p>This <a href="{{url_for('picture_gallery', circle_id=circle.id)}}">picture</a> was posted to {{link(circle)}}.</p>
 <div class="picture"><img src="{{posting.media.file_url()}}"></div>
 
 <h2>Discussion</h2>
