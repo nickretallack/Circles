@@ -702,7 +702,7 @@ def show_picture(circle_id, posting_id):
 @app.route('/circles/<int:circle_id>/pictures')
 def picture_gallery(circle_id):
     circle = get_required(Circle, circle_id)
-    postings = db.session.query(Posting).join(Posting.association).filter_by(type='photos').order_by(Posting.last_bumped.desc())
+    postings = db.session.query(Posting).join(Posting.association).filter_by(type='photos').filter(Posting.circle == circle).order_by(Posting.last_bumped.desc())
     return render('gallery.html', circle=circle, postings=postings)
 
 # -------------------------------- END  ------------------------------
