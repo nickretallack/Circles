@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% from 'macros.html' import link %}
+
+{% block content %}
+<h1>Pictures for {{link(circle)}}</h1>
+<ul class="gallery"> {% for posting in postings %}
+<li><a href="{{posting.photo_url}}"><img src="{{posting.media.thumbnail(200,200)}}"></a>
+{% endfor %} </ul>
+{% endblock %}

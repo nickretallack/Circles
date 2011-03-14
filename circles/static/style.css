@@ -16,3 +16,4 @@ textarea {width:100%; display:block}
 .invitation-link textarea {min-width:50ex; height:2em; border:none}
 .posting {border-bottom:1px solid #eee; padding:1ex 0}
 .picture {text-align:center}
+.gallery li {display:inline-block; vertical-align:middle; margin:2px}

@@ -600,7 +600,7 @@ class Posting(db.Model):
 
     @property
     def photo_url(self):
-        return url_for('show_picture', posting_id=self.id)
+        return url_for('show_picture', circle_id=self.circle_id, posting_id=self.id)
 
     @property
     def reply_form(self):
@@ -689,13 +689,20 @@ def make_dirs_for(filename):
     if not os.path.isdir(directory):
         os.makedirs(directory)
 
-@app.route('/pictures/<int:posting_id>')
-def show_picture(posting_id):
+@app.route('/circles/<int:circle_id>/pictures/<int:posting_id>')
+def show_picture(circle_id, posting_id):
     posting = get_required(Posting, posting_id)
+    if circle_id != posting.circle_id:
+        raise Http404
     circle = posting.circle
     you = check_access(circle)
     discussion_form = CommentForm(request.form)
     return render('photo.html', circle=circle, posting=posting, you=you, discussion_form=discussion_form)
 
+@app.route('/circles/<int:circle_id>/pictures')
+def picture_gallery(circle_id):
+    circle = get_required(Circle, circle_id)
+    postings = db.session.query(Posting).join(Posting.association).filter_by(type='photos').order_by(Posting.last_bumped.desc())
+    return render('gallery.html', circle=circle, postings=postings)
 
 # -------------------------------- END  ------------------------------
