@@ -1,8 +1,18 @@
 {% extends 'base.html' %}
 {% from 'macros.html' import link %}
+{% from 'discussion.html' import render_discussion %}
 
 {% block content %}
 <p>This picture was posted to {{link(circle)}}.</p>
 <div class="picture"><img src="{{posting.media.file_url()}}"></div>
 
+<h2>Discussion</h2>
+{% if you %}
+<form action="{{url_for('reply_to_posting', posting_id=posting.id)}}" method="POST">
+{{discussion_form.text}}
+<button>Say it</button>
+</form>
+{% endif %}
+
+{{ render_discussion(posting.discussion, url_for('reply_to_posting', posting_id=posting.id), you)}}
 {% endblock %}

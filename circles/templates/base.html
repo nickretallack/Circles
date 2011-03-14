@@ -6,15 +6,19 @@
 <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.0/jquery.min.js"></script>
 <script type="text/javascript">
 $(function(){
+    function find_reply_form(link){
+        return link.parents('.attribution:first').next()
+    }
+
     $('.reply-form').hide()
     $('.reply-trigger').click(function(event){
         var link = $(event.target)
-        var reply = link.parents('.comment:first').find('.reply-form:first')
+        var reply = find_reply_form(link)
         reply.show()
     })
     $('.cancel-reply').click(function(event){
         var link = $(event.target)
-        var reply = link.parents('.comment:first').find('.reply-form:first')
+        var reply = find_reply_form(link)
         reply.hide()
     })
 })

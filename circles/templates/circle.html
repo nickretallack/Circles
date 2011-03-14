@@ -1,6 +1,6 @@
 {% extends 'base.html'%}
 {% from 'macros.html' import link %}
-{% from 'discussion.html' import render_discussion %}
+{% from 'discussion.html' import render_discussion, render_attribution %}
 
 {% block content %}
 <h1>{{circle.name}}</h1>
@@ -30,10 +30,12 @@
 
 
 <ul >{% for posting in postings %}
-{% if posting.association.type == 'photos' %}
+{% set action = posting.reply_url %}
+<li class='posting'>{% if posting.association.type == 'photos' %}
 <a href="{{posting.photo_url}}"><img src="{{posting.media.thumbnail(200,200)}}"></a>
+{{ render_attribution(posting, action, has_membership) }}
 {% endif %}
-{{ render_discussion(posting.discussion, url_for('reply_to_posting', posting_id=posting.id), has_membership)}}
+{{ render_discussion(posting.discussion, action, has_membership)}}
 {% endfor %}</ul>
 
 {% endblock %}

@@ -533,8 +533,7 @@ def new_posting(circle_id):
                 media = existing_photo
                 file.close()
             else:
-                media = Photo(hash=hash, filename=filename) # TODO: who uploaded it?
-                import pdb; pdb.set_trace()
+                media = Photo(hash=hash, filename=filename)
                 destination = media.file_path()
                 make_dirs_for(destination)
                 file.stream.seek(0) # The hasher already ran through the file.
@@ -542,12 +541,11 @@ def new_posting(circle_id):
         else:
             media = NoMedia()
 
-        posting = Posting(circle=circle, last_bumped=datetime.now())
+        posting = Posting(circle=circle, last_bumped=datetime.now(), member=you)
         media.postings.append(posting)
         db.session.add(posting)
         db.session.add(media)
 
-        # only post comment if it exists
         post_comment(form, posting.discussion, you)
         db.session.commit()
     
@@ -556,9 +554,12 @@ def new_posting(circle_id):
 def post_comment(form, discussion, you):
     parent_id = parse_integer(form.parent_id.data)
     text = form.text.data
-    comment = Comment(discussion=discussion, parent_id=parent_id, text=text, member=you)
-    db.session.add(comment)
-    return comment
+    if text.strip():
+        comment = Comment(discussion=discussion, parent_id=parent_id, text=text, member=you)
+        db.session.add(comment)
+        return comment
+    else:
+        return None
 
 @app.route('/postings/<int:posting_id>/comments', methods=['POST'])
 def reply_to_posting(posting_id):
@@ -571,7 +572,7 @@ def reply_to_posting(posting_id):
         post_comment(form, posting.discussion, you)
         db.session.commit()
 
-    return redirect(url_for('show_circle',id=circle.id))
+    return redirect(request.referrer or url_for('show_circle',id=circle.id))
 
 # -------------------------------- MEDIA -------------------------------
 
@@ -579,7 +580,7 @@ class Posting(db.Model):
     __tablename__ = 'posting'
     id = db.Column(db.Integer, primary_key=True)
     circle_id = db.Column(db.Integer, db.ForeignKey('circles.id'))
-    creator_id = db.Column(db.Integer, db.ForeignKey('members.id'))
+    member_id = db.Column(db.Integer, db.ForeignKey('members.id'))
     discussion_id = db.Column(db.Integer, db.ForeignKey('discussions.id'))
     last_bumped = db.Column(db.DateTime)
 
@@ -591,6 +592,7 @@ class Posting(db.Model):
 
     circle = db.relationship(Circle, backref=db.backref('postings', order_by=id.desc()))
     discussion = db.relationship('Discussion', backref='posting', uselist=False)
+    member = db.relationship('Member', backref='postings')
 
     def __init__(self, *args, **kwargs):
         super(Posting, self).__init__(*args, **kwargs)
@@ -599,6 +601,14 @@ class Posting(db.Model):
     @property
     def photo_url(self):
         return url_for('show_picture', posting_id=self.id)
+
+    @property
+    def reply_form(self):
+        return CommentForm()
+
+    @property
+    def reply_url(self):
+        return url_for('reply_to_posting', posting_id=self.id)
 
 postable = association(Posting, 'media')
 
@@ -683,8 +693,9 @@ def make_dirs_for(filename):
 def show_picture(posting_id):
     posting = get_required(Posting, posting_id)
     circle = posting.circle
-    you = check_access(circle, True)
-    return render('photo.html', circle=circle, posting=posting, you=you)
+    you = check_access(circle)
+    discussion_form = CommentForm(request.form)
+    return render('photo.html', circle=circle, posting=posting, you=you, discussion_form=discussion_form)
 
 
 # -------------------------------- END  ------------------------------
