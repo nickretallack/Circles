@@ -1,0 +1,5 @@
+This is a minimal implementation of a social network.  It is currently running at http://circles.ws.
+
+It lacks one important feature before it can be really useful: email notifications.  I will try to get these in soon so people can make better use of it.
+
+The majority of the code exists in one big file.  This is because it was written quickly as an experiment.  I encountered some difficulties with SQLAlchemy when I attempted to split it up, so I've put friendly visual dividers in the comments instead.
